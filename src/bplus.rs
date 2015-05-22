@@ -205,17 +205,9 @@ impl<K> Bplus<K>
 #[test]
 fn test_new() {
     let mut bp = Bplus::new();
-    /*
-    println!("{:?}", bp);
-    bp.insert(0);
-    println!("{:?}", bp);
-    bp.insert(3);
-    println!("{:?}", bp);
-    bp.insert(1);
-    println!("{:?}", bp);
-    */
     for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
         bp.insert(x);
+        /*
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
             for _ in 0..indent {
@@ -223,6 +215,7 @@ fn test_new() {
             }
             println!("{:?}", key);
         });
+        */
     }
 
     let mut bp = Bplus::new();
