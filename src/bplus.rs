@@ -6,9 +6,9 @@ const MAX_ORDER: usize = 6;
 pub type K = u8;
 
 #[derive(Debug)]
-struct Entry {
+struct Entry<K> {
     keys: ArrayVec<[K; MAX_ORDER - 1]>,
-    children: ArrayVec<[Box<Entry>; MAX_ORDER]>,
+    children: ArrayVec<[Box<Entry<K>>; MAX_ORDER]>,
 }
 
 use std::iter::Enumerate;
@@ -17,7 +17,9 @@ pub fn enumerate<I: IntoIterator>(iter: I) -> Enumerate<I::IntoIter> {
     iter.into_iter().enumerate()
 }
 
-impl Entry {
+impl<K> Entry<K>
+    where K: Ord
+{
     fn new() -> Self {
         Entry {
             keys: ArrayVec::new(),
@@ -33,7 +35,7 @@ impl Entry {
     fn full(&self) -> bool { self.keys.len() == self.keys.capacity() }
 
     // split a node and return the median key and new child
-    fn split(&mut self) -> (K, Box<Entry>) {
+    fn split(&mut self) -> (K, Box<Entry<K>>) {
         debug_assert!(self.full());
 
         // new right side tree
@@ -78,7 +80,7 @@ impl Entry {
         } 
     }
 
-    fn insert(&mut self, key: K, child: Option<Box<Entry>>) {
+    fn insert(&mut self, key: K, child: Option<Box<Entry<K>>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
         debug_assert!(!self.full());
@@ -114,21 +116,23 @@ impl Entry {
 }
 
 #[derive(Debug)]
-pub struct Bplus {
+pub struct Bplus<K> {
     length: usize,
-    root: Box<Entry>,
+    root: Box<Entry<K>>,
 }
 
 use self::Task::*;
-enum Task {
-    Split(K, Box<Entry>),
+enum Task<K> {
+    Split(K, K, Box<Entry<K>>),
     //Insert(K),
     DoneExists,
     DoneInserted,
 }
 
 
-impl Bplus {
+impl<K> Bplus<K>
+    where K: Ord
+{
     pub fn new() -> Self {
         Bplus {
             length: 0,
@@ -141,19 +145,21 @@ impl Bplus {
     pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
 
     /// Insert **key**
-    pub fn insert(&mut self, key: K) {
+    pub fn insert(&mut self, mut key: K) {
 
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key(iter: &mut Box<Entry>, key: K) -> Task {
+        fn insert_key<K>(iter: &mut Box<Entry<K>>, mut key: K) -> Task<K>
+            where K: Ord
+        {
             loop {
                 if iter.full() {
                     let (median_key, right_child) = iter.split();
-                    println!("Got median: {:?}, child: {:?}", median_key, right_child);
-                    return Split(median_key, right_child)
+                    //println!("Got median: {:?}, child: {:?}", median_key, right_child);
+                    return Split(key, median_key, right_child)
                 }
 
                 let (has_key, lower_bound) = iter.find(&key);
@@ -166,8 +172,9 @@ impl Bplus {
                 }
 
                 match insert_key(&mut iter.children[lower_bound], key) {
-                    Split(median_key, right_child) => {
+                    Split(old_key, median_key, right_child) => {
                         iter.insert(median_key, Some(right_child));
+                        key = old_key;
                     }
                     other => return other,
                 }
@@ -177,7 +184,7 @@ impl Bplus {
         loop {
             let iter = &mut self.root;
             match insert_key(iter, key) {
-                Split(median_key, right_child) => {
+                Split(old_key, median_key, right_child) => {
                     // root will have
                     // left side: old root
                     // right side: right_child
@@ -185,6 +192,7 @@ impl Bplus {
                     mem::swap(&mut root, iter);
                     iter.children.push(root);
                     iter.insert(median_key, Some(right_child));
+                    key = old_key;
                 }
                 DoneExists => break,
                 DoneInserted => { self.length += 1; break }
