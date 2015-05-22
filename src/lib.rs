@@ -1,6 +1,5 @@
 extern crate arrayvec;
 
-#[macro_export]
 pub mod bplus;
 
 pub use bplus::{

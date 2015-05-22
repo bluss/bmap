@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use std::mem;
-use std::ptr;
+//use std::ptr;
 use std::default::Default;
 use std::borrow::Borrow;
 
@@ -146,7 +146,7 @@ impl<K, V> Entry<K, V>
     /// in order visit of the btree
     fn visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
         let mut keys = self.keys.iter();
-        let mut children = self.children.iter();
+        let children = self.children.iter();
         if self.is_leaf() {
             for key in keys {
                 f(level, key);
@@ -209,7 +209,7 @@ impl<K, V> Bplus<K, V>
     }
 
     /// Insert **key**
-    pub fn insert_default(&mut self, mut key: K)
+    fn insert_default(&mut self, key: K)
         where V: Default
     {
         self.insert(key, V::default());
