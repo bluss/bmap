@@ -120,5 +120,9 @@ fn test_new() {
     println!("{:?}", bp);
     bp.insert(1);
     println!("{:?}", bp);
+    for x in 3..20 {
+        bp.insert(x);
+        println!("{:?}", bp);
+    }
 }
 
