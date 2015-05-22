@@ -103,38 +103,27 @@ impl Bplus {
 
     pub fn insert(&mut self, key: K) {
 
-        fn insert_key(is_root: bool, iter: &mut Box<Entry>, key: K) -> Task {
-            if iter.full() {
-                let (median_key, right_child) = iter.split();
-                println!("Got median: {:?}, child: {:?}", median_key, right_child);
-                return Split(median_key, right_child)
-            }
-
-            let (has_key, lower_bound) = iter.find(&key);
-            if has_key {
-                return DoneExists;
-            }
-            if iter.is_leaf() {
-                iter.insert(key, None);
-                return DoneInserted;
-            }
-
+        fn insert_key(iter: &mut Box<Entry>, key: K) -> Task {
             loop {
-                match insert_key(false, &mut iter.children[lower_bound], key) {
-                    Split(key, right_child) => if !is_root {
+                if iter.full() {
+                    let (median_key, right_child) = iter.split();
+                    println!("Got median: {:?}, child: {:?}", median_key, right_child);
+                    return Split(median_key, right_child)
+                }
+
+                let (has_key, lower_bound) = iter.find(&key);
+                if has_key {
+                    return DoneExists;
+                }
+                if iter.is_leaf() {
+                    iter.insert(key, None);
+                    return DoneInserted;
+                }
+
+                match insert_key(&mut iter.children[lower_bound], key) {
+                    Split(key, right_child) => {
                         iter.insert(key, Some(right_child));
-                    } else {
-                        let mut root = Box::new(Entry::new());
-                        mem::swap(&mut root, iter);
-                        // root will have
-                        // left side: old root
-                        // right side: right_child
-                        //
-                        //mem::swap(&mut root, &mut self.root);
-                        //root.insert(median_key, Some(child));
-                        //let mut root = mem::replace(&mut self.root
-                        //root.insert(
-                    },
+                    }
                     other => return other,
                 }
             }
@@ -145,7 +134,7 @@ impl Bplus {
 
         loop {
             let iter = &mut self.root;
-            match insert_key(false, iter, key) {
+            match insert_key(iter, key) {
                 Split(key, right_child) => {
                     let mut root = Box::new(Entry::new());
                     mem::swap(&mut root, iter);
