@@ -107,6 +107,21 @@ impl<K, V> Entry<K, V>
         } 
     }
 
+    fn find_value_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        let (has, lower_bound) = self.find(key);
+        if has {
+            return Some(&mut self.values[lower_bound]);
+        }
+        if self.is_leaf() {
+            None
+        } else {
+            self.children[lower_bound].find_value_mut(key)
+        } 
+    }
+
     fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
@@ -177,6 +192,13 @@ impl<K, V> Bplus<K, V>
               Q: Ord,
     {
         self.root.find_value(key)
+    }
+
+    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        self.root.find_value_mut(key)
     }
 
     /// Insert **key**
