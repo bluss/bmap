@@ -166,12 +166,12 @@ pub struct Bplus<K, V> {
 
 use self::Task::*;
 enum Task<K, V> {
-    Split(K, V, K, V, Box<Entry<K, V>>),
-    //Insert(K),
+    Split((K, V), K, V, Box<Entry<K, V>>),
     DoneExists,
     DoneInserted,
 }
 
+type KV<K, V> = (K, V);
 
 impl<K, V> Bplus<K, V>
     where K: Ord
@@ -209,47 +209,46 @@ impl<K, V> Bplus<K, V>
     }
 
     /// Insert **key**
-    pub fn insert(&mut self, mut key: K, mut value: V) {
+    pub fn insert(&mut self, key: K, value: V) {
 
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key<K, V>(iter: &mut Box<Entry<K, V>>, mut key: K, mut value: V) -> Task<K, V>
+        fn insert_key<K, V>(iter: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Task<K, V>
             where K: Ord
         {
             loop {
                 if iter.full() {
-                    let (median_key, mval, right_child) = iter.split();
-                    //println!("Got median: {:?}, child: {:?}", median_key, right_child);
-                    return Split(key, value, median_key, mval, right_child)
+                    let (median_k, median_v, right_child) = iter.split();
+                    return Split(kv, median_k, median_v, right_child)
                 }
 
-                let (has_key, lower_bound) = iter.find(&key);
+                let (has_key, lower_bound) = iter.find(&kv.0);
                 if has_key {
                     return DoneExists;
                 }
                 if iter.is_leaf() {
-                    iter.insert(key, value, None);
+                    iter.insert(kv.0, kv.1, None);
                     return DoneInserted;
                 }
 
-                match insert_key(&mut iter.children[lower_bound], key, value) {
-                    Split(old_k, old_v, median_k, median_v, right_child) => {
+                match insert_key(&mut iter.children[lower_bound], kv) {
+                    Split(back_kv, median_k, median_v, right_child) => {
                         iter.insert(median_k, median_v, Some(right_child));
-                        key = old_k;
-                        value = old_v;
+                        kv = back_kv;
                     }
                     other => return other,
                 }
             }
         }
 
+        let mut kv = (key, value);
         loop {
             let iter = &mut self.root;
-            match insert_key(iter, key, value) {
-                Split(old_k, old_v, median_k, median_v, right_child) => {
+            match insert_key(iter, kv) {
+                Split(kv_, median_k, median_v, right_child) => {
                     // root will have
                     // left side: old root
                     // right side: right_child
@@ -257,8 +256,7 @@ impl<K, V> Bplus<K, V>
                     mem::swap(&mut root, iter);
                     iter.children.push(root);
                     iter.insert(median_k, median_v, Some(right_child));
-                    key = old_k;
-                    value = old_v;
+                    kv = kv_;
                 }
                 DoneExists => break,
                 DoneInserted => { self.length += 1; break }
