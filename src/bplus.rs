@@ -144,7 +144,7 @@ impl<K, V> Entry<K, V>
     }
 
     /// in order visit of the btree
-    fn visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
+    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
         let mut keys = self.keys.iter();
         let children = self.children.iter();
         if self.is_leaf() {
@@ -153,7 +153,7 @@ impl<K, V> Entry<K, V>
             }
         } else {
             for child in children {
-                child.visit_inorder(level + 1, f);
+                child._visit_inorder(level + 1, f);
                 match keys.next() {
                     Some(key) => f(level, key),
                     None => {}
@@ -206,13 +206,6 @@ impl<K, V> Bplus<K, V>
               Q: Ord,
     {
         self.root.find_value_mut(key)
-    }
-
-    /// Insert **key**
-    fn insert_default(&mut self, key: K)
-        where V: Default
-    {
-        self.insert(key, V::default());
     }
 
     /// Insert **key**
@@ -280,6 +273,10 @@ impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bplus<K, V>
     fn index(&self, index: &'a Q) -> &V {
         self.get(index).expect("Key error in Bplus")
     }
+}
+
+impl<K: Ord, V> Default for Bplus<K, V> {
+    fn default() -> Self { Bplus::new() }
 }
 
 
