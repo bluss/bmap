@@ -84,6 +84,18 @@ impl<K, V> Entry<K, V>
         } 
     }
 
+    fn find_value(&self, key: &K) -> Option<&V> {
+        let (has, lower_bound) = self.find(key);
+        if has {
+            return Some(&self.values[lower_bound]);
+        }
+        if self.is_leaf() {
+            None
+        } else {
+            self.children[lower_bound].find_value(key)
+        } 
+    }
+
     fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
@@ -268,4 +280,38 @@ fn test_generic() {
     }
     assert!(bp.contains(&"rusts"));
     assert!(bp.contains(&"fungi"));
+}
+
+#[macro_export]
+/// Create a **Bplus** from a list of key-value pairs
+///
+/// ## Example
+///
+/// ```
+/// #[macro_use]
+/// extern crate bplus;
+/// # fn main() {
+///
+/// let foo = bmap!{
+///     "a" => 1,
+///     "b" => 2,
+/// };
+/// assert_eq!(foo["a"], 1);
+/// assert_eq!(foo["b"], 2);
+/// assert_eq!(foo.get("c"), None);
+/// # }
+/// ```
+macro_rules! bmap {
+    // trailing comma case
+    ($($key:expr => $value:expr,)+) => (bmap!($($key => $value),+));
+    
+    ( $($key:expr => $value:expr),* ) => {
+        {
+            let mut _map = $crate::Bplus::new();
+            $(
+                _map.insert_full($key, $value);
+            )*
+            _map
+        }
+    };
 }
