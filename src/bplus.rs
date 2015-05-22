@@ -228,6 +228,7 @@ fn test_new() {
     let mut bp = Bplus::new();
     for x in (0..20) {
         bp.insert(x);
+        /*
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
             for _ in 0..indent {
@@ -235,6 +236,7 @@ fn test_new() {
             }
             println!("{:?}", key);
         });
+        */
     }
 }
 
@@ -251,3 +253,13 @@ fn test_insert() {
     }
 }
 
+
+#[test]
+fn test_generic() {
+    let mut bp = Bplus::new();
+    for word in "a short treatise on rusts and other fungi".split_whitespace() {
+        bp.insert(word)
+    }
+    assert!(bp.contains(&"rusts"));
+    assert!(bp.contains(&"fungi"));
+}
