@@ -202,13 +202,14 @@ impl<K, V> Bplus<K, V>
     }
 
     /// Insert **key**
-    pub fn insert(&mut self, mut key: K)
+    pub fn insert_default(&mut self, mut key: K)
         where V: Default
     {
-        self.insert_full(key, V::default())
+        self.insert(key, V::default())
     }
+
     /// Insert **key**
-    pub fn insert_full(&mut self, mut key: K, mut value: V) {
+    pub fn insert(&mut self, mut key: K, mut value: V) {
 
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
@@ -279,9 +280,9 @@ impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bplus<K, V>
 
 #[test]
 fn test_new() {
-    let mut bp: Bplus<i32, i32> = Bplus::new();
+    let mut bp = Bplus::new();
     for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
-        bp.insert(x);
+        bp.insert(x, ());
         /*
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
@@ -295,7 +296,7 @@ fn test_new() {
 
     let mut bp = Bplus::new();
     for x in (0..20) {
-        bp.insert_full(x, x);
+        bp.insert(x, x);
         /*
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
@@ -311,25 +312,14 @@ fn test_new() {
 #[test]
 fn test_insert() {
     let mut bp = Bplus::new();
-    bp.insert_full(0, ());
+    bp.insert(0, ());
     assert!(bp.contains(&0));
     for x in 1..100 {
-        bp.insert(x);
+        bp.insert(x, ());
     }
     for x in 0..100 {
         assert!(bp.contains(&x));
     }
-}
-
-
-#[test]
-fn test_generic() {
-    let mut bp = Bplus::new();
-    for word in "a short treatise on rusts and other fungi".split_whitespace() {
-        bp.insert_full(word, word)
-    }
-    assert!(bp.contains(&"rusts"));
-    assert!(bp.contains(&"fungi"));
 }
 
 #[macro_export]
@@ -359,9 +349,34 @@ macro_rules! bmap {
         {
             let mut _map = $crate::Bplus::new();
             $(
-                _map.insert_full($key, $value);
+                _map.insert($key, $value);
             )*
             _map
         }
     };
 }
+
+#[test]
+fn test_insert_mutate() {
+    let mut m = bmap!{
+        "a" => 1,
+        "b" => 1,
+        "c" => 1,
+    };
+    assert_eq!(m["a"], 1);
+    assert_eq!(m["c"], 1);
+    *m.get_mut("a").unwrap() = 3;
+    assert_eq!(m["a"], 3);
+}
+
+
+#[test]
+fn test_generic() {
+    let mut bp = Bplus::new();
+    for word in "a short treatise on rusts and other fungi".split_whitespace() {
+        bp.insert(word, word)
+    }
+    assert!(bp.contains(&"rusts"));
+    assert!(bp.contains(&"fungi"));
+}
+
