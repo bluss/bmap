@@ -1,14 +1,14 @@
 use arrayvec::ArrayVec;
+use std::mem;
+use std::ptr;
 
-type Entries = ArrayVec<[Entry; 6]>;
-
-const ORDER: usize = 7;
+const MAX_ORDER: usize = 6;
 pub type K = u8;
 
 #[derive(Debug)]
 struct Entry {
-    keys: ArrayVec<[K; ORDER - 1]>,
-    children: ArrayVec<[Box<Entry>; ORDER]>,
+    keys: ArrayVec<[K; MAX_ORDER - 1]>,
+    children: ArrayVec<[Box<Entry>; MAX_ORDER]>,
 }
 
 use std::iter::Enumerate;
@@ -25,6 +25,9 @@ impl Entry {
         }
     }
 
+    fn max_order() -> usize { 6 }
+    fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
+
     fn is_leaf(&self) -> bool { self.children.len() == 0 }
     //fn order(&self) -> usize { self.children.len() }
     fn full(&self) -> bool { self.keys.len() == self.keys.capacity() }
@@ -32,7 +35,17 @@ impl Entry {
     // split a node and return the median key and new child
     fn split(&mut self) -> (K, Box<Entry>) {
         debug_assert!(self.full());
-        panic!()
+
+        // new right side tree
+        let mut right = Box::new(Entry::new());
+
+        /* Split keys and children between `left` and `right` */
+        // [ 0 1 2 3 ] -> [ 0 1 ] (2) [ 3 ]
+        // keys: [ 0 1 2 3 ] ->  [ 0 1 ] (2) [ 3 ]
+        // children: [ 0 1 2 3 4 ] -> [ 0 1 2 ] [ 3 4 ]
+        right.keys.extend(self.keys.drain(1 + Self::median_key_index()..));
+        let median_key = self.keys.remove(Self::median_key_index()).unwrap();
+        (median_key, right)
     }
 
     fn find(&self, key: &K) -> (bool, usize) {
@@ -50,11 +63,17 @@ impl Entry {
         (false, i)
     }
 
-    fn insert(&mut self, key: K) {
+    fn insert(&mut self, key: K, child: Option<Box<Entry>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
         debug_assert!(!self.full());
         self.keys.insert(pos, key);
+        match child {
+            Some(child_) => {
+                self.children.insert(pos + 1, child_);
+            }
+            None => {}
+        }
     }
 
 }
@@ -62,7 +81,7 @@ impl Entry {
 #[derive(Debug)]
 pub struct Bplus {
     length: usize,
-    root: Entry,
+    root: Box<Entry>,
 }
 
 
@@ -70,7 +89,7 @@ impl Bplus {
     pub fn new() -> Self {
         Bplus {
             length: 0,
-            root: Entry::new(),
+            root: Box::new(Entry::new()),
         }
     }
 
@@ -80,15 +99,25 @@ impl Bplus {
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
         //let mut parent = None;
-        let mut parent = None::<()>;
-        let mut iter = &mut self.root;
+        let mut parent = None::<&mut Entry>;
+        let mut iter = &mut *self.root;
         loop {
             if iter.full() {
                 let (median_key, child) = iter.split();
-                match parent {
+                println!("Got median: {:?}, child: {:?}", median_key, child);
+                match parent.take() {
                     Some(par) => {
+                        par.insert(median_key, Some(child));
+                        iter = par;
                     }
-                    None => {}
+                    None => {
+                        /* Split the root, update the it */
+                        let mut root = Box::new(Entry::new());
+                        //mem::swap(&mut root, &mut self.root);
+                        //root.insert(median_key, Some(child));
+                        //let mut root = mem::replace(&mut self.root
+                        //root.insert(
+                    }
                 }
             }
             let (has_key, lower_bound) = iter.find(&key);
@@ -99,12 +128,14 @@ impl Bplus {
                 break;
             }
 
+            //parent = Some(iter);
             iter = &mut {iter}.children[lower_bound];
 
             break;
 
         }
-        iter.insert(key);
+        self.length += 1;
+        iter.insert(key, None);
     }
 
 }
