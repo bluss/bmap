@@ -8,7 +8,7 @@ use std::ops::{
     Index,
 };
 
-const MAX_ORDER: usize = 6;
+const MAX_ORDER: usize = 12;
 
 #[derive(Debug)]
 struct Entry<K, V> {
