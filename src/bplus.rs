@@ -3,6 +3,10 @@ use std::mem;
 use std::ptr;
 use std::default::Default;
 
+use std::ops::{
+    Index,
+};
+
 const MAX_ORDER: usize = 6;
 
 #[derive(Debug)]
@@ -161,6 +165,10 @@ impl<K, V> Bplus<K, V>
 
     pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
 
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.root.find_value(key)
+    }
+
     /// Insert **key**
     pub fn insert(&mut self, mut key: K)
         where V: Default
@@ -223,6 +231,13 @@ impl<K, V> Bplus<K, V>
                 DoneInserted => { self.length += 1; break }
             }
         }
+    }
+}
+
+impl<'a, K: Ord, V> Index<&'a K> for Bplus<K, V> {
+    type Output = V;
+    fn index(&self, index: &'a K) -> &V {
+        self.get(index).expect("Key error in Bplus")
     }
 }
 
@@ -296,9 +311,9 @@ fn test_generic() {
 ///     "a" => 1,
 ///     "b" => 2,
 /// };
-/// assert_eq!(foo["a"], 1);
-/// assert_eq!(foo["b"], 2);
-/// assert_eq!(foo.get("c"), None);
+/// assert_eq!(foo[&"a"], 1);
+/// assert_eq!(foo[&"b"], 2);
+/// assert_eq!(foo.get(&"c"), None);
 /// # }
 /// ```
 macro_rules! bmap {
