@@ -136,6 +136,13 @@ impl<K, V> Entry<K, V>
         }
     }
 
+    fn update(&mut self, key: &K, value: V) -> V {
+        let (has, pos) = self.find(key);
+        debug_assert!(has);
+        let existing = mem::replace(&mut self.values[pos], value);
+        existing
+    }
+
     /// in order visit of the btree
     fn visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
         let mut keys = self.keys.iter();
@@ -167,7 +174,7 @@ pub struct Bplus<K, V> {
 use self::Task::*;
 enum Task<K, V> {
     Split((K, V), K, V, Box<Entry<K, V>>),
-    DoneExists,
+    DoneUpdated(V),
     DoneInserted,
 }
 
@@ -205,12 +212,11 @@ impl<K, V> Bplus<K, V>
     pub fn insert_default(&mut self, mut key: K)
         where V: Default
     {
-        self.insert(key, V::default())
+        self.insert(key, V::default());
     }
 
     /// Insert **key**
-    pub fn insert(&mut self, key: K, value: V) {
-
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
          * Don't step into any full node without splitting it, and pushing
@@ -227,7 +233,7 @@ impl<K, V> Bplus<K, V>
 
                 let (has_key, lower_bound) = iter.find(&kv.0);
                 if has_key {
-                    return DoneExists;
+                    return DoneUpdated(iter.update(&kv.0, kv.1));
                 }
                 if iter.is_leaf() {
                     iter.insert(kv.0, kv.1, None);
@@ -258,10 +264,11 @@ impl<K, V> Bplus<K, V>
                     iter.insert(median_k, median_v, Some(right_child));
                     kv = kv_;
                 }
-                DoneExists => break,
+                DoneUpdated(v) => return Some(v),
                 DoneInserted => { self.length += 1; break }
             }
         }
+        None
     }
 }
 
@@ -363,6 +370,8 @@ fn test_insert_mutate() {
     };
     assert_eq!(m["a"], 1);
     assert_eq!(m["c"], 1);
+    let old = m.insert("a", 2);
+    assert_eq!(old, Some(1));
     *m.get_mut("a").unwrap() = 3;
     assert_eq!(m["a"], 3);
 }
@@ -372,7 +381,7 @@ fn test_insert_mutate() {
 fn test_generic() {
     let mut bp = Bplus::new();
     for word in "a short treatise on rusts and other fungi".split_whitespace() {
-        bp.insert(word, word)
+        bp.insert(word, word);
     }
     assert!(bp.contains(&"rusts"));
     assert!(bp.contains(&"fungi"));
