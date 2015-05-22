@@ -178,19 +178,13 @@ impl Bplus {
             let iter = &mut self.root;
             match insert_key(iter, key) {
                 Split(median_key, right_child) => {
+                    // root will have
+                    // left side: old root
+                    // right side: right_child
                     let mut root = Box::new(Entry::new());
                     mem::swap(&mut root, iter);
                     iter.children.push(root);
                     iter.insert(median_key, Some(right_child));
-                        
-                    // root will have
-                    // left side: old root
-                    // right side: right_child
-                    //
-                    //mem::swap(&mut root, &mut self.root);
-                    //root.insert(median_key, Some(child));
-                    //let mut root = mem::replace(&mut self.root
-                    //root.insert(
                 }
                 DoneExists => break,
                 DoneInserted => { self.length += 1; break }
