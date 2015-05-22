@@ -235,9 +235,9 @@ impl<K, V> Bplus<K, V>
                 }
 
                 match insert_key(&mut iter.children[lower_bound], kv) {
-                    Split(back_kv, median_k, median_v, right_child) => {
+                    Split(kv_, median_k, median_v, right_child) => {
                         iter.insert(median_k, median_v, Some(right_child));
-                        kv = back_kv;
+                        kv = kv_;
                     }
                     other => return other,
                 }
