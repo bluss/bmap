@@ -45,6 +45,13 @@ impl Entry {
         // children: [ 0 1 2 3 4 ] -> [ 0 1 2 ] [ 3 4 ]
         right.keys.extend(self.keys.drain(1 + Self::median_key_index()..));
         let median_key = self.keys.remove(Self::median_key_index()).unwrap();
+        if !self.is_leaf() {
+            right.children.extend(self.children.drain(1 + Self::median_key_index()..));
+        }
+        println!("Split");
+        println!("Left: {:?}", self);
+        println!("Center: {:?}", median_key);
+        println!("Right: {:?}", right);
         (median_key, right)
     }
 
@@ -149,8 +156,8 @@ impl Bplus {
                 }
 
                 match insert_key(&mut iter.children[lower_bound], key) {
-                    Split(key, right_child) => {
-                        iter.insert(key, Some(right_child));
+                    Split(median_key, right_child) => {
+                        iter.insert(median_key, Some(right_child));
                     }
                     other => return other,
                 }
@@ -160,11 +167,11 @@ impl Bplus {
         loop {
             let iter = &mut self.root;
             match insert_key(iter, key) {
-                Split(key, right_child) => {
+                Split(median_key, right_child) => {
                     let mut root = Box::new(Entry::new());
                     mem::swap(&mut root, iter);
                     iter.children.push(root);
-                    iter.insert(key, Some(right_child));
+                    iter.insert(median_key, Some(right_child));
                         
                     // root will have
                     // left side: old root
@@ -186,6 +193,7 @@ impl Bplus {
 #[test]
 fn test_new() {
     let mut bp = Bplus::new();
+    /*
     println!("{:?}", bp);
     bp.insert(0);
     println!("{:?}", bp);
@@ -193,7 +201,20 @@ fn test_new() {
     println!("{:?}", bp);
     bp.insert(1);
     println!("{:?}", bp);
-    for x in 3..20 {
+    */
+    for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
+        bp.insert(x);
+        println!("{:?}", bp);
+        bp.root.visit_inorder(0, &mut |indent, key| {
+            for _ in 0..indent {
+                print!("  ");
+            }
+            println!("{:?}", key);
+        });
+    }
+
+    let mut bp = Bplus::new();
+    for x in (0..20) {
         bp.insert(x);
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
