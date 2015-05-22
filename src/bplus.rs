@@ -3,7 +3,6 @@ use std::mem;
 use std::ptr;
 
 const MAX_ORDER: usize = 6;
-pub type K = u8;
 
 #[derive(Debug)]
 struct Entry<K> {
