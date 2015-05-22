@@ -2,6 +2,7 @@ use arrayvec::ArrayVec;
 use std::mem;
 use std::ptr;
 use std::default::Default;
+use std::borrow::Borrow;
 
 use std::ops::{
     Index,
@@ -61,12 +62,15 @@ impl<K, V> Entry<K, V>
         (median_key, median_value, right)
     }
 
-    fn find(&self, key: &K) -> (bool, usize) {
+    fn find<Q: ?Sized>(&self, key: &Q) -> (bool, usize)
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         // find lower bound
         let mut i = 0;
         for k in &self.keys {
-            if k >= key {
-                if k == key {
+            if k.borrow() >= key {
+                if k.borrow() == key {
                     return (true, i);
                 }
                 break;
@@ -88,7 +92,10 @@ impl<K, V> Entry<K, V>
         } 
     }
 
-    fn find_value(&self, key: &K) -> Option<&V> {
+    fn find_value<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         let (has, lower_bound) = self.find(key);
         if has {
             return Some(&self.values[lower_bound]);
@@ -165,7 +172,10 @@ impl<K, V> Bplus<K, V>
 
     pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
 
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         self.root.find_value(key)
     }
 
@@ -234,9 +244,12 @@ impl<K, V> Bplus<K, V>
     }
 }
 
-impl<'a, K: Ord, V> Index<&'a K> for Bplus<K, V> {
+impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bplus<K, V>
+    where K: Ord + Borrow<Q>,
+          Q: Ord,
+{
     type Output = V;
-    fn index(&self, index: &'a K) -> &V {
+    fn index(&self, index: &'a Q) -> &V {
         self.get(index).expect("Key error in Bplus")
     }
 }
@@ -311,9 +324,9 @@ fn test_generic() {
 ///     "a" => 1,
 ///     "b" => 2,
 /// };
-/// assert_eq!(foo[&"a"], 1);
-/// assert_eq!(foo[&"b"], 2);
-/// assert_eq!(foo.get(&"c"), None);
+/// assert_eq!(foo["a"], 1);
+/// assert_eq!(foo["b"], 2);
+/// assert_eq!(foo.get("c"), None);
 /// # }
 /// ```
 macro_rules! bmap {
