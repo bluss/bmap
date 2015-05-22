@@ -76,6 +76,26 @@ impl Entry {
         }
     }
 
+    /// in order visit of the btree
+    fn visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
+        let mut keys = self.keys.iter();
+        let mut children = self.children.iter();
+        if self.is_leaf() {
+            for key in keys {
+                f(level, key);
+            }
+        } else {
+            for child in children {
+                child.visit_inorder(level + 1, f);
+                match keys.next() {
+                    Some(key) => f(level, key),
+                    None => {}
+                }
+            }
+        }
+    }
+
+
 }
 
 #[derive(Debug)]
@@ -101,7 +121,15 @@ impl Bplus {
         }
     }
 
+    pub fn len(&self) -> usize { self.length }
+
+    /// Insert **key**
     pub fn insert(&mut self, key: K) {
+
+        /* Top-down insertion:
+         * Search downwards to find a leaf where we can insert the key.
+         * Don't step into any full node without splitting it, and pushing
+         * its median key into the parent. */
 
         fn insert_key(iter: &mut Box<Entry>, key: K) -> Task {
             loop {
@@ -127,9 +155,6 @@ impl Bplus {
                     other => return other,
                 }
             }
-            //parent = Some(iter);
-            //iter = &mut {iter}.children[lower_bound];
-
         }
 
         loop {
@@ -150,60 +175,11 @@ impl Bplus {
                     //let mut root = mem::replace(&mut self.root
                     //root.insert(
                 }
-                other => return,
+                DoneExists => break,
+                DoneInserted => { self.length += 1; break }
             }
         }
-
-        return;
-
-        /* Top-down insertion:
-         * Search downwards to find a leaf where we can insert the key.
-         * Don't step into any full node without splitting it, and pushing
-         * its median key into the parent. */
-        //let mut parent = None;
-        let mut parent = None::<&mut Entry>;
-        let mut iter = &mut *self.root;
-        loop {
-            if iter.full() {
-                let (median_key, right_child) = iter.split();
-                println!("Got median: {:?}, child: {:?}", median_key, right_child);
-                match parent.take() {
-                    Some(par) => {
-                        iter = par;
-                        iter.insert(median_key, Some(right_child));
-                    }
-                    None => {
-                        /* Split the root, update the it */
-                        let mut root = Box::new(Entry::new());
-                        // root will have
-                        // left side: old root
-                        // right side: right_child
-                        //
-                        //mem::swap(&mut root, &mut self.root);
-                        //root.insert(median_key, Some(child));
-                        //let mut root = mem::replace(&mut self.root
-                        //root.insert(
-                    }
-                }
-            }
-            let (has_key, lower_bound) = iter.find(&key);
-            if has_key {
-                return
-            }
-            if iter.is_leaf() {
-                break;
-            }
-
-            //parent = Some(iter);
-            iter = &mut {iter}.children[lower_bound];
-
-            break;
-
-        }
-        self.length += 1;
-        iter.insert(key, None);
     }
-
 }
 
 
@@ -220,6 +196,12 @@ fn test_new() {
     for x in 3..20 {
         bp.insert(x);
         println!("{:?}", bp);
+        bp.root.visit_inorder(0, &mut |indent, key| {
+            for _ in 0..indent {
+                print!("  ");
+            }
+            println!("{:?}", key);
+        });
     }
 }
 
