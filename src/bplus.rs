@@ -48,10 +48,6 @@ impl Entry {
         if !self.is_leaf() {
             right.children.extend(self.children.drain(1 + Self::median_key_index()..));
         }
-        println!("Split");
-        println!("Left: {:?}", self);
-        println!("Center: {:?}", median_key);
-        println!("Right: {:?}", right);
         (median_key, right)
     }
 
@@ -68,6 +64,18 @@ impl Entry {
             i += 1;
         }
         (false, i)
+    }
+
+    fn find_key(&self, key: &K) -> bool {
+        let (has, lower_bound) = self.find(key);
+        if has {
+            return true;
+        }
+        if self.is_leaf() {
+            false
+        } else {
+            self.children[lower_bound].find_key(key)
+        } 
     }
 
     fn insert(&mut self, key: K, child: Option<Box<Entry>>) {
@@ -129,6 +137,8 @@ impl Bplus {
     }
 
     pub fn len(&self) -> usize { self.length }
+
+    pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
 
     /// Insert **key**
     pub fn insert(&mut self, key: K) {
@@ -223,6 +233,19 @@ fn test_new() {
             }
             println!("{:?}", key);
         });
+    }
+}
+
+#[test]
+fn test_insert() {
+    let mut bp = Bplus::new();
+    bp.insert(0);
+    assert!(bp.contains(&0));
+    for x in 1..100 {
+        bp.insert(x);
+    }
+    for x in 0..100 {
+        assert!(bp.contains(&x));
     }
 }
 
