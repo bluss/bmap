@@ -1,13 +1,15 @@
 use arrayvec::ArrayVec;
 use std::mem;
 use std::ptr;
+use std::default::Default;
 
 const MAX_ORDER: usize = 6;
 
 #[derive(Debug)]
-struct Entry<K> {
+struct Entry<K, V> {
     keys: ArrayVec<[K; MAX_ORDER - 1]>,
-    children: ArrayVec<[Box<Entry<K>>; MAX_ORDER]>,
+    values: ArrayVec<[V; MAX_ORDER - 1]>,
+    children: ArrayVec<[Box<Entry<K, V>>; MAX_ORDER]>,
 }
 
 use std::iter::Enumerate;
@@ -16,12 +18,13 @@ pub fn enumerate<I: IntoIterator>(iter: I) -> Enumerate<I::IntoIter> {
     iter.into_iter().enumerate()
 }
 
-impl<K> Entry<K>
+impl<K, V> Entry<K, V>
     where K: Ord
 {
     fn new() -> Self {
         Entry {
             keys: ArrayVec::new(),
+            values: ArrayVec::new(),
             children: ArrayVec::new(),
         }
     }
@@ -34,7 +37,7 @@ impl<K> Entry<K>
     fn full(&self) -> bool { self.keys.len() == self.keys.capacity() }
 
     // split a node and return the median key and new child
-    fn split(&mut self) -> (K, Box<Entry<K>>) {
+    fn split(&mut self) -> (K, V, Box<Entry<K, V>>) {
         debug_assert!(self.full());
 
         // new right side tree
@@ -45,11 +48,13 @@ impl<K> Entry<K>
         // keys: [ 0 1 2 3 ] ->  [ 0 1 ] (2) [ 3 ]
         // children: [ 0 1 2 3 4 ] -> [ 0 1 2 ] [ 3 4 ]
         right.keys.extend(self.keys.drain(1 + Self::median_key_index()..));
+        right.values.extend(self.values.drain(1 + Self::median_key_index()..));
         let median_key = self.keys.remove(Self::median_key_index()).unwrap();
+        let median_value = self.values.remove(Self::median_key_index()).unwrap();
         if !self.is_leaf() {
             right.children.extend(self.children.drain(1 + Self::median_key_index()..));
         }
-        (median_key, right)
+        (median_key, median_value, right)
     }
 
     fn find(&self, key: &K) -> (bool, usize) {
@@ -79,11 +84,12 @@ impl<K> Entry<K>
         } 
     }
 
-    fn insert(&mut self, key: K, child: Option<Box<Entry<K>>>) {
+    fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
         debug_assert!(!self.full());
         self.keys.insert(pos, key);
+        self.values.insert(pos, value);
         match child {
             Some(child_) => {
                 self.children.insert(pos + 1, child_);
@@ -115,21 +121,21 @@ impl<K> Entry<K>
 }
 
 #[derive(Debug)]
-pub struct Bplus<K> {
+pub struct Bplus<K, V> {
     length: usize,
-    root: Box<Entry<K>>,
+    root: Box<Entry<K, V>>,
 }
 
 use self::Task::*;
-enum Task<K> {
-    Split(K, K, Box<Entry<K>>),
+enum Task<K, V> {
+    Split(K, V, K, V, Box<Entry<K, V>>),
     //Insert(K),
     DoneExists,
     DoneInserted,
 }
 
 
-impl<K> Bplus<K>
+impl<K, V> Bplus<K, V>
     where K: Ord
 {
     pub fn new() -> Self {
@@ -144,21 +150,27 @@ impl<K> Bplus<K>
     pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
 
     /// Insert **key**
-    pub fn insert(&mut self, mut key: K) {
+    pub fn insert(&mut self, mut key: K)
+        where V: Default
+    {
+        self.insert_full(key, V::default())
+    }
+    /// Insert **key**
+    pub fn insert_full(&mut self, mut key: K, mut value: V) {
 
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key<K>(iter: &mut Box<Entry<K>>, mut key: K) -> Task<K>
+        fn insert_key<K, V>(iter: &mut Box<Entry<K, V>>, mut key: K, mut value: V) -> Task<K, V>
             where K: Ord
         {
             loop {
                 if iter.full() {
-                    let (median_key, right_child) = iter.split();
+                    let (median_key, mval, right_child) = iter.split();
                     //println!("Got median: {:?}, child: {:?}", median_key, right_child);
-                    return Split(key, median_key, right_child)
+                    return Split(key, value, median_key, mval, right_child)
                 }
 
                 let (has_key, lower_bound) = iter.find(&key);
@@ -166,14 +178,15 @@ impl<K> Bplus<K>
                     return DoneExists;
                 }
                 if iter.is_leaf() {
-                    iter.insert(key, None);
+                    iter.insert(key, value, None);
                     return DoneInserted;
                 }
 
-                match insert_key(&mut iter.children[lower_bound], key) {
-                    Split(old_key, median_key, right_child) => {
-                        iter.insert(median_key, Some(right_child));
-                        key = old_key;
+                match insert_key(&mut iter.children[lower_bound], key, value) {
+                    Split(old_k, old_v, median_k, median_v, right_child) => {
+                        iter.insert(median_k, median_v, Some(right_child));
+                        key = old_k;
+                        value = old_v;
                     }
                     other => return other,
                 }
@@ -182,16 +195,17 @@ impl<K> Bplus<K>
 
         loop {
             let iter = &mut self.root;
-            match insert_key(iter, key) {
-                Split(old_key, median_key, right_child) => {
+            match insert_key(iter, key, value) {
+                Split(old_k, old_v, median_k, median_v, right_child) => {
                     // root will have
                     // left side: old root
                     // right side: right_child
                     let mut root = Box::new(Entry::new());
                     mem::swap(&mut root, iter);
                     iter.children.push(root);
-                    iter.insert(median_key, Some(right_child));
-                    key = old_key;
+                    iter.insert(median_k, median_v, Some(right_child));
+                    key = old_k;
+                    value = old_v;
                 }
                 DoneExists => break,
                 DoneInserted => { self.length += 1; break }
@@ -203,7 +217,7 @@ impl<K> Bplus<K>
 
 #[test]
 fn test_new() {
-    let mut bp = Bplus::new();
+    let mut bp: Bplus<i32, i32> = Bplus::new();
     for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
         bp.insert(x);
         /*
@@ -219,7 +233,7 @@ fn test_new() {
 
     let mut bp = Bplus::new();
     for x in (0..20) {
-        bp.insert(x);
+        bp.insert_full(x, x);
         /*
         println!("{:?}", bp);
         bp.root.visit_inorder(0, &mut |indent, key| {
@@ -235,7 +249,7 @@ fn test_new() {
 #[test]
 fn test_insert() {
     let mut bp = Bplus::new();
-    bp.insert(0);
+    bp.insert_full(0, ());
     assert!(bp.contains(&0));
     for x in 1..100 {
         bp.insert(x);
@@ -250,7 +264,7 @@ fn test_insert() {
 fn test_generic() {
     let mut bp = Bplus::new();
     for word in "a short treatise on rusts and other fungi".split_whitespace() {
-        bp.insert(word)
+        bp.insert_full(word, word)
     }
     assert!(bp.contains(&"rusts"));
     assert!(bp.contains(&"fungi"));
