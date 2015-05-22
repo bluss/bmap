@@ -1,0 +1,8 @@
+[package]
+name = "bplus"
+version = "0.1.0"
+authors = ["bluss"]
+
+[dependencies]
+
+arrayvec = "0.3.1"
