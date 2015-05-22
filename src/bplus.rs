@@ -39,8 +39,8 @@ impl Entry {
         // find lower bound
         let mut i = 0;
         for k in &self.keys {
-            if key >= k {
-                if key == k {
+            if k >= key {
+                if k == key {
                     return (true, i);
                 }
                 break;
@@ -51,6 +51,10 @@ impl Entry {
     }
 
     fn insert(&mut self, key: K) {
+        let (has, pos) = self.find(&key);
+        debug_assert!(!has);
+        debug_assert!(!self.full());
+        self.keys.insert(pos, key);
     }
 
 }
@@ -111,6 +115,10 @@ fn test_new() {
     let mut bp = Bplus::new();
     println!("{:?}", bp);
     bp.insert(0);
+    println!("{:?}", bp);
+    bp.insert(3);
+    println!("{:?}", bp);
+    bp.insert(1);
     println!("{:?}", bp);
 }
 
