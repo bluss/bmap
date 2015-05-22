@@ -129,12 +129,8 @@ macro_rules! map_find_seq_bench {
 }
 
 use bplus::Bplus;
-
-
 use std::collections::BTreeMap;
-use rand::{Rng, thread_rng};
 
-use test::{Bencher, black_box};
 
 /*
 map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
