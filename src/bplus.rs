@@ -144,6 +144,18 @@ impl<K, V> Entry<K, V>
         }
     }
 
+    fn insert_in_root(&mut self, key: K, value: V,
+                      left: Box<Entry<K, V>>, right: Box<Entry<K, V>>)
+    {
+        debug_assert!(self.keys.len() == 0);
+        debug_assert!(self.values.len() == 0);
+        debug_assert!(self.children.len() == 0);
+        self.keys.push(key);
+        self.values.push(value);
+        self.children.push(left);
+        self.children.push(right);
+    }
+
     fn update(&mut self, key: &K, value: V) -> V {
         let (has, pos) = self.find(key);
         debug_assert!(has);
@@ -265,8 +277,8 @@ impl<K, V> Bplus<K, V>
                     // left side: old root
                     // right side: right_child
                     let left_child = mem::replace(root, Box::new(Entry::new()));
-                    root.children.push(left_child);
-                    root.insert(median_k, median_v, Some(right_child));
+                    root.insert_in_root(median_k, median_v,
+                                        left_child, right_child);
                     kv = kv_;
                 }
                 DoneUpdated(v) => { return Some(v) }
