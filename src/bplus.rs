@@ -54,8 +54,8 @@ impl<K, V> Entry<K, V>
         // children: [ 0 1 2 3 4 ] -> [ 0 1 2 ] [ 3 4 ]
         right.keys.extend(self.keys.drain(1 + Self::median_key_index()..));
         right.values.extend(self.values.drain(1 + Self::median_key_index()..));
-        let median_key = self.keys.remove(Self::median_key_index()).unwrap();
-        let median_value = self.values.remove(Self::median_key_index()).unwrap();
+        let median_key = self.keys.pop().unwrap();
+        let median_value = self.values.pop().unwrap();
         if !self.is_leaf() {
             right.children.extend(self.children.drain(1 + Self::median_key_index()..));
         }
@@ -98,9 +98,8 @@ impl<K, V> Entry<K, V>
     {
         let (has, lower_bound) = self.find(key);
         if has {
-            return Some(&self.values[lower_bound]);
-        }
-        if self.is_leaf() {
+            Some(self.value_at(lower_bound))
+        } else if self.is_leaf() {
             None
         } else {
             self.children[lower_bound].find_value(key)
@@ -113,13 +112,20 @@ impl<K, V> Entry<K, V>
     {
         let (has, lower_bound) = self.find(key);
         if has {
-            return Some(&mut self.values[lower_bound]);
-        }
-        if self.is_leaf() {
+            Some(self.value_at_mut(lower_bound))
+        } else if self.is_leaf() {
             None
         } else {
             self.children[lower_bound].find_value_mut(key)
         } 
+    }
+
+    fn value_at(&self, index: usize) -> &V {
+        &self.values[index]
+    }
+
+    fn value_at_mut(&mut self, index: usize) -> &mut V {
+        &mut self.values[index]
     }
 
     fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
@@ -139,7 +145,7 @@ impl<K, V> Entry<K, V>
     fn update(&mut self, key: &K, value: V) -> V {
         let (has, pos) = self.find(key);
         debug_assert!(has);
-        let existing = mem::replace(&mut self.values[pos], value);
+        let existing = mem::replace(self.value_at_mut(pos), value);
         existing
     }
 
