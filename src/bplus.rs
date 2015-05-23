@@ -228,27 +228,27 @@ impl<K, V> Bplus<K, V>
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key<K, V>(iter: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Task<K, V>
+        fn insert_key<K, V>(entry: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Task<K, V>
             where K: Ord
         {
             loop {
-                if iter.full() {
-                    let (median_k, median_v, right_child) = iter.split();
+                if entry.full() {
+                    let (median_k, median_v, right_child) = entry.split();
                     return Split(kv, median_k, median_v, right_child)
                 }
 
-                let (has_key, lower_bound) = iter.find(&kv.0);
+                let (has_key, lower_bound) = entry.find(&kv.0);
                 if has_key {
-                    return DoneUpdated(iter.update(&kv.0, kv.1));
+                    return DoneUpdated(entry.update(&kv.0, kv.1));
                 }
-                if iter.is_leaf() {
-                    iter.insert(kv.0, kv.1, None);
+                if entry.is_leaf() {
+                    entry.insert(kv.0, kv.1, None);
                     return DoneInserted;
                 }
 
-                match insert_key(&mut iter.children[lower_bound], kv) {
+                match insert_key(&mut entry.children[lower_bound], kv) {
                     Split(kv_, median_k, median_v, right_child) => {
-                        iter.insert(median_k, median_v, Some(right_child));
+                        entry.insert(median_k, median_v, Some(right_child));
                         kv = kv_;
                     }
                     other => return other,
@@ -258,16 +258,15 @@ impl<K, V> Bplus<K, V>
 
         let mut kv = (key, value);
         loop {
-            let iter = &mut self.root;
-            match insert_key(iter, kv) {
+            let root = &mut self.root;
+            match insert_key(root, kv) {
                 Split(kv_, median_k, median_v, right_child) => {
-                    // root will have
+                    // Root was split, replace it with a new empty node,
                     // left side: old root
                     // right side: right_child
-                    let mut root = Box::new(Entry::new());
-                    mem::swap(&mut root, iter);
-                    iter.children.push(root);
-                    iter.insert(median_k, median_v, Some(right_child));
+                    let left_child = mem::replace(root, Box::new(Entry::new()));
+                    root.children.push(left_child);
+                    root.insert(median_k, median_v, Some(right_child));
                     kv = kv_;
                 }
                 DoneUpdated(v) => { return Some(v) }
