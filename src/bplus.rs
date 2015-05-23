@@ -34,7 +34,7 @@ impl<K, V> Entry<K, V>
         }
     }
 
-    fn max_order() -> usize { 6 }
+    fn max_order() -> usize { MAX_ORDER }
     fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
 
     fn is_leaf(&self) -> bool { self.children.len() == 0 }
