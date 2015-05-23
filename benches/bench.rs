@@ -128,6 +128,36 @@ macro_rules! map_find_seq_bench {
     )
 }
 
+macro_rules! map_insert_rand_bench {
+    ($name: ident, $n: expr, $map: ident) => (
+        #[bench]
+        pub fn $name(b: &mut ::test::Bencher) {
+            use std::iter::Iterator;
+            use rand::{thread_rng, Rng};
+            use std::vec::Vec;
+            use test::black_box;
+
+            let mut map = $map::new();
+            let n: usize = $n;
+
+            // setup
+            let mut rng = thread_rng();
+            let mut keys: Vec<_> = (0..n).map(|_| rng.gen::<usize>() % n).collect();
+
+            rng.shuffle(&mut keys);
+
+            // measure
+            b.iter(|| {
+                map = $map::new();
+                for &k in &keys {
+                    let k = black_box(k);
+                    map.insert(k, k);
+                }
+            })
+        }
+    )
+}
+
 use bplus::Bplus;
 use std::collections::BTreeMap;
 
@@ -139,6 +169,11 @@ map_insert_rand_bench!{insert_rand_10_000, 10_000, BTreeMap}
 map_insert_seq_bench!{insert_seq_100,    100,    BTreeMap}
 map_insert_seq_bench!{insert_seq_10_000, 10_000, BTreeMap}
 */
+
+map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
+map_insert_rand_bench!{insert_rand_10_000, 10_000, BTreeMap}
+map_insert_rand_bench!{insert_rand_100_bplus,    100,    Bplus}
+map_insert_rand_bench!{insert_rand_10_000_bplus, 10_000, Bplus}
 
 map_find_rand_bench!{find_rand_100,    100,    BTreeMap}
 map_find_rand_bench!{find_rand_100_bplus,    100,    Bplus}
