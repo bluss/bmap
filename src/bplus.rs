@@ -270,11 +270,10 @@ impl<K, V> Bplus<K, V>
                     iter.insert(median_k, median_v, Some(right_child));
                     kv = kv_;
                 }
-                DoneUpdated(v) => return Some(v),
-                DoneInserted => { self.length += 1; break }
+                DoneUpdated(v) => { return Some(v) }
+                DoneInserted => { self.length += 1; return None }
             }
         }
-        None
     }
 }
 
