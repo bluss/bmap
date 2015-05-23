@@ -1,10 +1,8 @@
 extern crate arrayvec;
 
-pub mod bplus;
+pub mod bmap;
 
-pub use bplus::{
-    Bplus,
-};
+pub use bmap::Bmap;
 
 #[test]
 fn it_works() {

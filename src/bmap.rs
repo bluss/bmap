@@ -189,7 +189,7 @@ impl<K, V> Entry<K, V>
 }
 
 #[derive(Debug)]
-pub struct Bplus<K, V> {
+pub struct Bmap<K, V> {
     length: usize,
     root: Box<Entry<K, V>>,
 }
@@ -203,11 +203,11 @@ enum Task<K, V> {
 
 type KV<K, V> = (K, V);
 
-impl<K, V> Bplus<K, V>
+impl<K, V> Bmap<K, V>
     where K: Ord
 {
     pub fn new() -> Self {
-        Bplus {
+        Bmap {
             length: 0,
             root: Box::new(Entry::new()),
         }
@@ -290,24 +290,24 @@ impl<K, V> Bplus<K, V>
     }
 }
 
-impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bplus<K, V>
+impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bmap<K, V>
     where K: Ord + Borrow<Q>,
           Q: Ord,
 {
     type Output = V;
     fn index(&self, index: &'a Q) -> &V {
-        self.get(index).expect("Key error in Bplus")
+        self.get(index).expect("Key error in Bmap")
     }
 }
 
-impl<K: Ord, V> Default for Bplus<K, V> {
-    fn default() -> Self { Bplus::new() }
+impl<K: Ord, V> Default for Bmap<K, V> {
+    fn default() -> Self { Bmap::new() }
 }
 
 
 #[test]
 fn test_new() {
-    let mut bp = Bplus::new();
+    let mut bp = Bmap::new();
     for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
         bp.insert(x, ());
         /*
@@ -321,7 +321,7 @@ fn test_new() {
         */
     }
 
-    let mut bp = Bplus::new();
+    let mut bp = Bmap::new();
     for x in (0..20) {
         bp.insert(x, x);
         /*
@@ -338,7 +338,7 @@ fn test_new() {
 
 #[test]
 fn test_insert() {
-    let mut bp = Bplus::new();
+    let mut bp = Bmap::new();
     bp.insert(0, ());
     assert!(bp.contains(&0));
     for x in 1..100 {
@@ -350,13 +350,13 @@ fn test_insert() {
 }
 
 #[macro_export]
-/// Create a **Bplus** from a list of key-value pairs
+/// Create a **Bmap** from a list of key-value pairs
 ///
 /// ## Example
 ///
 /// ```
 /// #[macro_use]
-/// extern crate bplus;
+/// extern crate bmap;
 /// # fn main() {
 ///
 /// let foo = bmap!{
@@ -374,7 +374,7 @@ macro_rules! bmap {
     
     ( $($key:expr => $value:expr),* ) => {
         {
-            let mut _map = $crate::Bplus::new();
+            let mut _map = $crate::Bmap::new();
             $(
                 _map.insert($key, $value);
             )*
@@ -401,7 +401,7 @@ fn test_insert_mutate() {
 
 #[test]
 fn test_generic() {
-    let mut bp = Bplus::new();
+    let mut bp = Bmap::new();
     for word in "a short treatise on rusts and other fungi".split_whitespace() {
         bp.insert(word, word);
     }

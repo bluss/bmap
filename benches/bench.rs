@@ -9,7 +9,7 @@
 // except according to those terms.
 
 #![feature(test)]
-extern crate bplus;
+extern crate bmap;
 extern crate rand;
 extern crate test;
 
@@ -158,7 +158,7 @@ macro_rules! map_insert_rand_bench {
     )
 }
 
-use bplus::Bplus;
+use bmap::Bmap;
 use std::collections::BTreeMap;
 
 
@@ -172,16 +172,16 @@ map_insert_seq_bench!{insert_seq_10_000, 10_000, BTreeMap}
 
 map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
 map_insert_rand_bench!{insert_rand_10_000, 10_000, BTreeMap}
-map_insert_rand_bench!{insert_rand_100_bplus,    100,    Bplus}
-map_insert_rand_bench!{insert_rand_10_000_bplus, 10_000, Bplus}
+map_insert_rand_bench!{insert_rand_100_bmap,    100,    Bmap}
+map_insert_rand_bench!{insert_rand_10_000_bmap, 10_000, Bmap}
 
 map_find_rand_bench!{find_rand_100,    100,    BTreeMap}
-map_find_rand_bench!{find_rand_100_bplus,    100,    Bplus}
+map_find_rand_bench!{find_rand_100_bmap,    100,    Bmap}
 map_find_rand_bench!{find_rand_10_000, 10_000, BTreeMap}
-map_find_rand_bench!{find_rand_10_000_bplus, 10_000, Bplus}
+map_find_rand_bench!{find_rand_10_000_bmap, 10_000, Bmap}
 
 map_find_seq_bench!{find_seq_100,    100,    BTreeMap}
-map_find_seq_bench!{find_seq_100_bplus,    100,    Bplus}
+map_find_seq_bench!{find_seq_100_bmap,    100,    Bmap}
 map_find_seq_bench!{find_seq_10_000, 10_000, BTreeMap}
-map_find_seq_bench!{find_seq_10_000_bplus, 10_000, Bplus}
+map_find_seq_bench!{find_seq_10_000_bmap, 10_000, Bmap}
 
