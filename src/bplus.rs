@@ -133,14 +133,16 @@ impl<K, V> Entry<K, V>
     fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
+        self.insert_at(pos, key, value, child);
+    }
+
+    fn insert_at(&mut self, pos: usize, key: K, value: V,
+                 child: Option<Box<Entry<K, V>>>) {
         debug_assert!(!self.full());
         self.keys.insert(pos, key);
         self.values.insert(pos, value);
-        match child {
-            Some(child_) => {
-                self.children.insert(pos + 1, child_);
-            }
-            None => {}
+        if let Some(child_) = child {
+            self.children.insert(pos + 1, child_);
         }
     }
 
@@ -249,16 +251,15 @@ impl<K, V> Bplus<K, V>
                     return Split(kv, median_k, median_v, right_child)
                 }
 
-                let (has_key, lower_bound) = entry.find(&kv.0);
+                let (has_key, best_pos) = entry.find(&kv.0);
                 if has_key {
                     return DoneUpdated(entry.update(&kv.0, kv.1));
-                }
-                if entry.is_leaf() {
-                    entry.insert(kv.0, kv.1, None);
+                } else if entry.is_leaf() {
+                    entry.insert_at(best_pos, kv.0, kv.1, None);
                     return DoneInserted;
                 }
 
-                match insert_key(&mut entry.children[lower_bound], kv) {
+                match insert_key(&mut entry.children[best_pos], kv) {
                     Split(kv_, median_k, median_v, right_child) => {
                         entry.insert(median_k, median_v, Some(right_child));
                         kv = kv_;
