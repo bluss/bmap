@@ -80,15 +80,17 @@ impl<K, V> Entry<K, V>
         (false, i)
     }
 
-    fn find_key(&self, key: &K) -> bool {
+    fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         let (has, lower_bound) = self.find(key);
         if has {
-            return true;
-        }
-        if self.is_leaf() {
+            true
+        } else if self.is_leaf() {
             false
         } else {
-            self.children[lower_bound].find_key(key)
+            self.children[lower_bound].contains_key(key)
         } 
     }
 
@@ -198,7 +200,12 @@ impl<K, V> Bplus<K, V>
 
     pub fn len(&self) -> usize { self.length }
 
-    pub fn contains(&self, key: &K) -> bool { self.root.find_key(key) }
+    pub fn contains<Q: ?Sized>(&self, key: &Q) -> bool
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        self.root.contains_key(key)
+    }
 
     pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
         where K: Borrow<Q>,
