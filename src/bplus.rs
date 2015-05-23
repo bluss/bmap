@@ -49,9 +49,10 @@ impl<K, V> Entry<K, V>
         let mut right = Box::new(Entry::new());
 
         /* Split keys and children between `left` and `right` */
-        // [ 0 1 2 3 ] -> [ 0 1 ] (2) [ 3 ]
-        // keys: [ 0 1 2 3 ] ->  [ 0 1 ] (2) [ 3 ]
-        // children: [ 0 1 2 3 4 ] -> [ 0 1 2 ] [ 3 4 ]
+        // keys:      [ b d f ]    ->  [ b ] d [ f ]
+        // children: [ a c e g ]   -> [ a c ] [ e g ]
+        // keys:      [ 1 3 5 7 ]  ->  [ 2 4 ] 6 [ 8 ]
+        // children: [ 0 2 4 6 8 ] -> [ 1 3 5 ] [ 7 9 ]
         right.keys.extend(self.keys.drain(1 + Self::median_key_index()..));
         right.values.extend(self.values.drain(1 + Self::median_key_index()..));
         let median_key = self.keys.pop().unwrap();
