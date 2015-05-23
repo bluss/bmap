@@ -3,9 +3,8 @@ name = "bplus"
 version = "0.1.0"
 authors = ["bluss"]
 
-[dependencies]
-
-arrayvec = "0.3.1"
+[dependencies.arrayvec]
+version = "0.3.3"
 
 [dev-dependencies]
 rand = "*"
