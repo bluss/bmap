@@ -43,18 +43,24 @@ struct Entry<K, V> {
     position: usize,
 }
 
-/// WARNING: Needs to update parent after cloning.
-impl<K, V> Clone for Entry<K, V>
+/// Correctly clones recursively. The top entry will have a null parent.
+impl<K, V> Clone for Box<Entry<K, V>>
     where K: Clone, V: Clone,
 {
     fn clone(&self) -> Self {
-        Entry {
+        let mut entry = Box::new(Entry {
             keys: self.keys.clone(),
             values: self.values.clone(),
             children: self.children.clone(),
             parent: null_mut(),
             position: self.position,
+        });
+
+        let parent_ptr = &mut *entry as *mut _;
+        for child in &mut entry.children {
+            child.parent = parent_ptr;
         }
+        entry
     }
 }
 
@@ -268,16 +274,6 @@ impl<K, V> Entry<K, V> {
         }
     }
 
-    /// Recursively fixup all parent pointers
-    fn fixup_parents(&mut self) {
-        let self_ptr = self as *mut _;
-        for child in &mut self.children {
-            child.fixup_parents();
-            child.parent = self_ptr;
-        }
-    }
-
-
     // -----------
     // DELETION
     // -----------
@@ -404,23 +400,11 @@ impl<K, V> Entry<K, V> {
 
 }
 
+#[derive(Clone)] // OK because Entry's clone is sane
 #[derive(Debug)]
 pub struct Bmap<K, V> {
     length: usize,
     root: Box<Entry<K, V>>,
-}
-
-impl<K, V> Clone for Bmap<K, V>
-    where K: Clone, V: Clone
-{
-    fn clone(&self) -> Self {
-        let mut map = Bmap {
-            length: self.length,
-            root: self.root.clone(),
-        };
-        map.root.fixup_parents();
-        map
-    }
 }
 
 use self::Insert::{Split, Updated, Inserted};
