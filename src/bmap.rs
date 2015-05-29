@@ -488,7 +488,7 @@ impl<K, V> Bmap<K, V>
                     // Remove key from current entry,
                     // and merge the children
                     if entry.merge_siblings(pos) {
-                        return Self::remove_key(entry, key);
+                        continue;
                     }
                 } else if ro > MIN_ORDER && lo != MAX_ORDER {
                     entry.rotate_right_to_left(pos);
@@ -526,19 +526,16 @@ impl<K, V> Bmap<K, V>
                 } else {
                     if pos > 0 { pos -= 1 }
                     if entry.merge_siblings(pos) {
-                        return Self::remove_key(entry, key);
+                        continue;
                     }
                 }
             } else {
                 debug_assert!(entry.children[pos].order() >= MIN_ORDER);
             }
 
-            if !entry.is_leaf() {
-                entry = &mut {entry}.children[pos];
-                debug_assert!(entry.order() >= MIN_ORDER);
-            } else {
-                // entry was made a leaf by merging, go over it again.
-            }
+            debug_assert!(!entry.is_leaf());
+            entry = &mut {entry}.children[pos];
+            debug_assert!(entry.order() >= MIN_ORDER);
         }
     }
 
