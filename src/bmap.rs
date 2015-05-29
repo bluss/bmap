@@ -63,11 +63,14 @@ impl<K, V> Entry<K, V>
         (median_key, median_value, right)
     }
 
+    /// Return (is_equal, best_position)
     fn find<Q: ?Sized>(&self, key: &Q) -> (bool, usize)
         where K: Borrow<Q>,
               Q: Ord,
     {
-        // find lower bound
+        // FIXME: When .max_order() is large, use binary search
+        // find lower bound:
+        // index where keys[i] < key for all i < index
         let mut i = 0;
         for k in &self.keys {
             if k.borrow() >= key {
