@@ -19,7 +19,6 @@ use unreachable::debug_assert_unreachable;
 // B=6, and MAX_ORDER = 2 * B in Btreemap
 
 const MAX_ORDER: usize = 12;
-const MIN_ORDER: usize = MAX_ORDER / 2;
 
 /// Safe to use with any wholly initialized memory `ptr`
 unsafe fn raw_byte_repr<'a, T>(ptr: &'a T) -> &'a [u8]
@@ -53,8 +52,10 @@ impl<K, V> Entry<K, V>
     }
 
     fn max_order() -> usize { MAX_ORDER }
-    fn min_order() -> usize { MIN_ORDER }
+    fn min_order() -> usize { Self::max_order() / 2 }
     fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
+    fn this_max_order(&self) -> usize { Self::max_order() }
+    fn this_min_order(&self) -> usize { Self::min_order() }
 
     fn order(&self) -> usize { self.keys.len() + 1 }
 
@@ -487,15 +488,15 @@ impl<K, V> Bmap<K, V>
                     let right = &entry.children[pos + 1];
                     (left.order(), right.order())
                 };
-                if lo == MIN_ORDER && lo == ro {
+                if lo == entry.this_min_order() && lo == ro {
                     // Remove key from current entry,
                     // and merge the children
                     if entry.merge_siblings(pos) {
                         continue;
                     }
-                } else if ro > MIN_ORDER && lo != MAX_ORDER {
+                } else if ro > entry.this_min_order() && lo != entry.this_max_order() {
                     entry.rotate_right_to_left(pos);
-                } else if ro != MAX_ORDER {
+                } else if ro != entry.this_max_order() {
                     entry.rotate_left_to_right(pos);
                     pos += 1;
                 } else {
@@ -520,11 +521,11 @@ impl<K, V> Bmap<K, V>
 
             } else if entry.is_leaf() {
                 return None
-            } else if entry.children[pos].order() == MIN_ORDER {
+            } else if entry.children[pos].order() == entry.this_min_order() {
                 // Don't step into a node with minimal order
-                if pos > 0 && entry.children[pos - 1].order() > MIN_ORDER {
+                if pos > 0 && entry.children[pos - 1].order() > entry.this_min_order() {
                     entry.rotate_left_to_right(pos - 1);
-                } else if pos + 1 < entry.children.len() && entry.children[pos + 1].order() > MIN_ORDER {
+                } else if pos + 1 < entry.children.len() && entry.children[pos + 1].order() > entry.this_min_order() {
                     entry.rotate_right_to_left(pos);
                 } else {
                     if pos > 0 { pos -= 1 }
@@ -533,12 +534,12 @@ impl<K, V> Bmap<K, V>
                     }
                 }
             } else {
-                debug_assert!(entry.children[pos].order() >= MIN_ORDER);
+                debug_assert!(entry.children[pos].order() >= entry.this_min_order());
             }
 
             debug_assert!(!entry.is_leaf());
             entry = &mut {entry}.children[pos];
-            debug_assert!(entry.order() >= MIN_ORDER);
+            debug_assert!(entry.order() >= entry.this_min_order());
         }
     }
 
