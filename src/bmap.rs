@@ -394,7 +394,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> where K: Debug {
         let entry = self.entry;
         debug_assert!(entry.is_leaf());
         let index = self.index;
-        if index < entry.keys.len() {
+        if index != entry.keys.len() {
             self.index += 1;
             Some((&entry.keys[index], &entry.values[index]))
         } else {
