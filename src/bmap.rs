@@ -455,40 +455,44 @@ fn test_insert() {
 #[test]
 fn test_fuzz() {
     let mut rng: ChaChaRng = rand::random();
+
     const N: usize = 149;
-    let mut keys: Vec<_> = (0..N).collect();
-    rng.shuffle(&mut keys);
+    const NTEST: usize = 10;
+    for _ in 0..NTEST {
+        let mut keys: Vec<_> = (0..N).collect();
+        rng.shuffle(&mut keys);
 
-    let mut m = Bmap::new();
-    for &key in &keys {
-        m.insert(key, ());
-    }
-
-    for &key in &keys {
-        assert!(m.contains(&key));
-    }
-    // check parents
-    /*
-    let mut root = &*m.root as *const _;
-    let mut parent = &*m.root as *const _;
-    m.root._visit_inorder(0, &mut |indent, entry| {
-        if entry.parent.is_null() {
-            assert_eq!(entry as *const Entry<usize, ()>, root);
-        } else {
-            println!("Entry: {:?}, {:?}", entry, entry as *const Entry<usize, ()>);
-            unsafe {
-                println!("Parent: {:?}", *entry.parent);
-            }
-            assert_eq!(entry.parent as *const Entry<usize, ()>, parent);
+        let mut m = Bmap::new();
+        for &key in &keys {
+            m.insert(key, ());
         }
-        parent = entry;
-    });
-    */
 
-    keys.sort();
-    assert_eq!(m.iter().count(), keys.len());
-    for (key, (map_key, _)) in keys.iter().zip(m.iter()) {
-        assert_eq!(key, map_key);
+        for &key in &keys {
+            assert!(m.contains(&key));
+        }
+        // check parents
+        /*
+        let mut root = &*m.root as *const _;
+        let mut parent = &*m.root as *const _;
+        m.root._visit_inorder(0, &mut |indent, entry| {
+            if entry.parent.is_null() {
+                assert_eq!(entry as *const Entry<usize, ()>, root);
+            } else {
+                println!("Entry: {:?}, {:?}", entry, entry as *const Entry<usize, ()>);
+                unsafe {
+                    println!("Parent: {:?}", *entry.parent);
+                }
+                assert_eq!(entry.parent as *const Entry<usize, ()>, parent);
+            }
+            parent = entry;
+        });
+        */
+
+        keys.sort();
+        assert_eq!(m.iter().count(), keys.len());
+        for (key, (map_key, _)) in keys.iter().zip(m.iter()) {
+            assert_eq!(key, map_key);
+        }
     }
 }
 
