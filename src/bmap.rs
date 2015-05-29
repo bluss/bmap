@@ -191,14 +191,12 @@ pub struct Bmap<K, V> {
     root: Box<Entry<K, V>>,
 }
 
-use self::Task::*;
-enum Task<K, V> {
+use self::Insert::*;
+enum Insert<K, V> {
     Split((K, V), K, V, Box<Entry<K, V>>),
-    DoneUpdated(V),
-    DoneInserted,
+    Updated(V),
+    Inserted,
 }
-
-type KV<K, V> = (K, V);
 
 impl<K, V> Bmap<K, V>
     where K: Ord
@@ -240,7 +238,7 @@ impl<K, V> Bmap<K, V>
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key<K, V>(entry: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Task<K, V>
+        fn insert_key<K, V>(entry: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Insert<K, V>
             where K: Ord
         {
             loop {
@@ -251,10 +249,10 @@ impl<K, V> Bmap<K, V>
 
                 let (has_key, best_pos) = entry.find(&kv.0);
                 if has_key {
-                    return DoneUpdated(entry.update(&kv.0, kv.1));
+                    return Updated(entry.update(&kv.0, kv.1));
                 } else if entry.is_leaf() {
                     entry.insert_at(best_pos, kv.0, kv.1, None);
-                    return DoneInserted;
+                    return Inserted;
                 }
 
                 match insert_key(&mut entry.children[best_pos], kv) {
@@ -280,8 +278,8 @@ impl<K, V> Bmap<K, V>
                                         left_child, right_child);
                     kv = kv_;
                 }
-                DoneUpdated(v) => { return Some(v) }
-                DoneInserted => { self.length += 1; return None }
+                Updated(v) => { return Some(v) }
+                Inserted => { self.length += 1; return None }
             }
         }
     }
