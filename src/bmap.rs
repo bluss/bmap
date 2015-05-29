@@ -17,12 +17,6 @@ struct Entry<K, V> {
     children: ArrayVec<[Box<Entry<K, V>>; MAX_ORDER]>,
 }
 
-use std::iter::Enumerate;
-#[inline]
-pub fn enumerate<I: IntoIterator>(iter: I) -> Enumerate<I::IntoIter> {
-    iter.into_iter().enumerate()
-}
-
 impl<K, V> Entry<K, V>
     where K: Ord
 {
