@@ -261,19 +261,6 @@ impl<K, V> Entry<K, V> {
         }
     }
 
-    /// in order visit of the btree
-    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &Entry<K, V>))
-        where K: Debug, V: Debug,
-    {
-        f(level, self);
-        if !self.is_leaf() {
-            let children = self.children.iter();
-            for child in children {
-                child._visit_inorder(level + 1, f);
-            }
-        }
-    }
-
     // -----------
     // DELETION
     // -----------
@@ -677,14 +664,6 @@ fn test_new() {
         bp.insert(x, ());
     }
 
-    /*
-    bp.root._visit_inorder(0, &mut |indent, key| {
-        for _ in 0..indent {
-            print!("  ");
-        }
-        println!("{:?}", key);
-    });
-    */
     for elt in bp.iter() {
         println!("Iter: {:?}", elt);
     }
@@ -738,23 +717,6 @@ fn test_fuzz() {
         for &key in &keys {
             assert!(m.contains(&key));
         }
-        // check parents
-        /*
-        let mut root = &*m.root as *const _;
-        let mut parent = &*m.root as *const _;
-        m.root._visit_inorder(0, &mut |indent, entry| {
-            if entry.parent.is_null() {
-                assert_eq!(entry as *const Entry<usize, ()>, root);
-            } else {
-                println!("Entry: {:?}, {:?}", entry, entry as *const Entry<usize, ()>);
-                unsafe {
-                    println!("Parent: {:?}", *entry.parent);
-                }
-                assert_eq!(entry.parent as *const Entry<usize, ()>, parent);
-            }
-            parent = entry;
-        });
-        */
 
         keys.sort();
         assert_eq!(m.iter().count(), keys.len());
