@@ -360,17 +360,22 @@ impl<K, V> Bmap<K, V>
             rkey = rchild.keys.remove(0).unwrap();
             rval = rchild.values.remove(0).unwrap();
             child = rchild.children.remove(0);
+            for other in &mut rchild.children {
+                other.position -= 1;
+            }
         }
 
         // replace parent key
         let pkey = mem::replace(&mut entry.keys[pos], rkey);
         let pval = mem::replace(&mut entry.values[pos], rval);
-        entry.children[pos].keys.push(pkey);
-        entry.children[pos].values.push(pval);
+        let left_child = &mut *entry.children[pos];
+        let left_order = left_child.order();
+        left_child.keys.push(pkey);
+        left_child.values.push(pval);
         if let Some(mut child) = child {
-            child.parent = &mut *entry.children[pos];
-            child.position = entry.children[pos].order();
-            entry.children[pos].children.push(child);
+            child.parent = left_child;
+            child.position = left_order;
+            left_child.children.push(child);
         }
     }
 
@@ -750,11 +755,12 @@ fn test_fuzz_remove() {
     println!("Seed: {:?}", seed);
     let mut rng = ChaChaRng::from_seed(&seed);
 
-    const MAX: usize = 100; // max test size
+    const MAX: usize = 200; // max test size
     const NTEST: usize = 1000;
     type Key = u8;
-    for _ in 0..NTEST {
-        let size = rng.gen_range(0, MAX);
+    for test_index in 0..NTEST {
+        let testsz = 10 + MAX * (10 * test_index) / NTEST / 10;
+        let size = rng.gen_range(0, testsz);
         let mut keys: Vec<_> = rng.gen_iter::<Key>().take(size).collect();
 
         let mut m = Bmap::new();
@@ -802,6 +808,7 @@ fn test_fuzz_remove() {
             }
             assert_eq!(removed.is_some(), is_present);
         }
+        println!("After remove: {:#?}", m);
         assert_eq!(m.iter().count(), m.len());
         assert_eq!(m.len(), keys.len() - n_present);
         println!("Tree After Removals: {:#?}", m);
