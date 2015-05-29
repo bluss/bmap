@@ -5,7 +5,6 @@ use std::default::Default;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::slice;
-use std::cmp::max;
 
 #[cfg(test)]
 extern crate rand;
@@ -759,7 +758,7 @@ fn test_fuzz() {
 //#[cfg(test)]
 #[test]
 fn test_fuzz_remove() {
-    let mut input_seed = None;
+    let input_seed = None;
 
     let seed = match input_seed {
         Some(inner) => inner,
@@ -954,7 +953,6 @@ fn test_remove() {
     // Both children full case
     let max_keys = MAX_ORDER - 1;
     let mut bp = bmap!();
-    let n = max_keys * 2 + 1;
 
     let mid = max_keys + 1;
     bp.insert(mid, mid);
