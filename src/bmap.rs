@@ -82,13 +82,13 @@ impl<K, V> Entry<K, V>
         where K: Borrow<Q>,
               Q: Ord,
     {
-        // FIXME: When .max_order() is large, use binary search
-        /*
-        return match self.keys.binary_search_by(|k| k.borrow().cmp(key)) {
-            Ok(ix) => (true, ix),
-            Err(ix) => (false, ix),
-        };
-        */
+        // FIXME: Find out a good cutoff for binary search
+        if Self::max_order() >= 128 {
+            return match self.keys.binary_search_by(|k| k.borrow().cmp(key)) {
+                Ok(ix) => (true, ix),
+                Err(ix) => (false, ix),
+            };
+        }
         // find lower bound:
         // index where keys[i] < key for all i < index
         let mut i = 0;
