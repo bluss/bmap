@@ -276,7 +276,7 @@ impl<K, V> Bmap<K, V>
          * Don't step into any full node without splitting it, and pushing
          * its median key into the parent. */
 
-        fn insert_key<K, V>(entry: &mut Box<Entry<K, V>>, mut kv: (K, V)) -> Insert<K, V>
+        fn insert_key<K, V>(entry: &mut Entry<K, V>, mut kv: (K, V)) -> Insert<K, V>
             where K: Ord
         {
             loop {
