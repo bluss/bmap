@@ -390,12 +390,13 @@ impl<K, V> Bmap<K, V>
         entry.children[pos + 1].keys.insert(0, pkey);
         entry.children[pos + 1].values.insert(0, pval);
         if let Some(mut child) = child {
-            for other in &mut entry.children {
+            let parent = &mut *entry.children[pos + 1];
+            for other in &mut parent.children {
                 other.position += 1;
             }
-            child.parent = &mut *entry.children[pos + 1];
+            child.parent = parent;
             child.position = 0;
-            entry.children[pos + 1].children.insert(0, child);
+            parent.children.insert(0, child);
         }
     }
 
@@ -411,8 +412,7 @@ impl<K, V> Bmap<K, V>
         //assert!(entry.keys.len() > 0);
         let removed_root = entry.keys.len() == 0;
         for child in &mut entry.children[pos + 1..] {
-            // FIXME position
-            //child.position -= 1;
+            child.position -= 1;
         }
         {
             let left_child = &mut entry.children[pos];
@@ -924,7 +924,6 @@ fn test_remove() {
     let max_keys = MAX_ORDER - 1;
     let mut bp = bmap!();
     let n = max_keys * 2 + 1;
-    let mut keyiter = 0 .. (2 * max_keys + 1);
 
     let mid = max_keys + 1;
     bp.insert(mid, mid);
