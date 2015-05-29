@@ -17,6 +17,7 @@ extern crate itertools as it;
 
 use std::ops::{
     Index,
+    IndexMut,
 };
 
 use unreachable::debug_assert_unreachable;
@@ -592,7 +593,16 @@ impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bmap<K, V>
 {
     type Output = V;
     fn index(&self, index: &'a Q) -> &V {
-        self.get(index).expect("Key error in Bmap")
+        self.get(index).expect("Bmap: Key error")
+    }
+}
+
+impl<'a, K, V, Q: ?Sized> IndexMut<&'a Q> for Bmap<K, V>
+    where K: Ord + Borrow<Q>,
+          Q: Ord,
+{
+    fn index_mut(&mut self, index: &'a Q) -> &mut V {
+        self.get_mut(index).expect("Bmap: Key error")
     }
 }
 
@@ -677,15 +687,6 @@ fn test_new() {
     let mut bp = Bmap::new();
     for x in (0..20) {
         bp.insert(x, x);
-        /*
-        println!("{:?}", bp);
-        bp.root.visit_inorder(0, &mut |indent, key| {
-            for _ in 0..indent {
-                print!("  ");
-            }
-            println!("{:?}", key);
-        });
-        */
     }
 }
 
@@ -853,7 +854,8 @@ fn test_insert_mutate() {
     assert_eq!(m["c"], 1);
     let old = m.insert("a", 2);
     assert_eq!(old, Some(1));
-    *m.get_mut("a").unwrap() = 3;
+    assert_eq!(m.get_mut("a"), Some(&mut 2));
+    m["a"] = 3;
     assert_eq!(m["a"], 3);
 }
 
@@ -876,8 +878,8 @@ fn test_generic() {
     for word in "a short treatise on rusts and other fungi".split_whitespace() {
         bp.insert(word, word);
     }
-    assert!(bp.contains(&"rusts"));
-    assert!(bp.contains(&"fungi"));
+    assert!(bp.contains("rusts"));
+    assert!(bp.contains("fungi"));
 }
 
 #[test]
