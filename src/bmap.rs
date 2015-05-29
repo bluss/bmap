@@ -745,8 +745,8 @@ fn test_fuzz_remove() {
     println!("Seed: {:?}", seed);
     let mut rng = ChaChaRng::from_seed(&seed);
 
-    const MAX: usize = 200; // max test size
-    const NTEST: usize = 1000;
+    const MAX: usize = 50; // max test size
+    const NTEST: usize = 10000;
     type Key = u8;
     for test_index in 0..NTEST {
         let testsz = 10 + MAX * (10 * test_index) / NTEST / 10;
@@ -769,7 +769,7 @@ fn test_fuzz_remove() {
             assert_eq!(key, map_key);
         }
 
-        let rm_size = rng.gen_range(0, MAX / 2);
+        let rm_size = rng.gen_range(0, MAX);
         let mut removals: Vec<_> = rng.gen_iter::<Key>().take(rm_size).collect();
         removals.sort();
         removals.dedup();
