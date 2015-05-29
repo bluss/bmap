@@ -463,10 +463,6 @@ impl<K, V> Bmap<K, V>
         self.root.find_value_mut(key)
     }
 
-    pub fn iter(&self) -> Iter<K, V> {
-        new_iter(self)
-    }
-
     /// Insert **key**
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         /* Top-down insertion:
@@ -601,6 +597,19 @@ impl<K, V> Bmap<K, V>
         }
         value.map(|(_, v)| v)
     }
+
+    pub fn iter(&self) -> Iter<K, V> {
+        // find and focus the lower bound
+        let mut entry = &self.root;
+        while !entry.is_leaf() {
+            entry = &entry.children[0];
+        }
+        Iter {
+            entry: entry,
+            keyiter: entry.keys.iter(),
+            valiter: entry.values.iter(),
+        }
+    }
 }
 
 impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bmap<K, V>
@@ -617,24 +626,15 @@ impl<K: Ord, V> Default for Bmap<K, V> {
     fn default() -> Self { Bmap::new() }
 }
 
-pub struct Iter<'a, K: 'a + Ord, V: 'a> {
+pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
     valiter: slice::Iter<'a, V>,
 }
 
-fn new_iter<K: Ord, V>(map: &Bmap<K, V>) -> Iter<K, V> {
-    // find and focus the lower bound
-    let mut entry = &map.root;
-    while !entry.is_leaf() {
-        entry = &entry.children[0];
-    }
-    Iter {
-        entry: entry,
-        keyiter: entry.keys.iter(),
-        valiter: entry.values.iter(),
-    }
-}
+// The iterator has some nice invariants.
+// The currently focused entry is always a leaf, and its iterators
+// are always present.
 
 impl<'a, K: Ord, V> Iter<'a, K, V> {
     fn next_switch_node(&mut self) -> Option<<Self as Iterator>::Item> {
