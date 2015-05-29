@@ -1,4 +1,6 @@
 extern crate arrayvec;
+#[cfg(test)]
+extern crate rand;
 
 pub mod bmap;
 

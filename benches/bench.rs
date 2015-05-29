@@ -161,6 +161,10 @@ macro_rules! map_insert_rand_bench {
 use bmap::Bmap;
 use std::collections::BTreeMap;
 
+use rand::{thread_rng, Rng};
+use test::Bencher;
+use test::black_box;
+
 
 /*
 map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
@@ -185,3 +189,62 @@ map_find_seq_bench!{find_seq_100_bmap,    100,    Bmap}
 map_find_seq_bench!{find_seq_10_000, 10_000, BTreeMap}
 map_find_seq_bench!{find_seq_10_000_bmap, 10_000, Bmap}
 
+fn bench_iter(b: &mut Bencher, size: i32) {
+    let mut map = BTreeMap::<i32, i32>::new();
+    let mut rng = thread_rng();
+
+    for _ in 0..size {
+        map.insert(rng.gen(), rng.gen());
+    }
+
+    b.iter(|| {
+        for entry in &map {
+            black_box(entry);
+        }
+    });
+}
+
+fn bench_iter_bmap(b: &mut Bencher, size: i32) {
+    let mut map = Bmap::<i32, i32>::new();
+    let mut rng = thread_rng();
+
+    for _ in 0..size {
+        map.insert(rng.gen(), rng.gen());
+    }
+
+    b.iter(|| {
+        for entry in map.iter() {
+            black_box(entry);
+        }
+    });
+}
+
+#[bench]
+pub fn iter_20(b: &mut Bencher) {
+    bench_iter(b, 20);
+}
+
+#[bench]
+pub fn iter_1000(b: &mut Bencher) {
+    bench_iter(b, 1000);
+}
+
+#[bench]
+pub fn iter_100000(b: &mut Bencher) {
+    bench_iter(b, 100000);
+}
+
+#[bench]
+pub fn iter_20_bmap(b: &mut Bencher) {
+    bench_iter_bmap(b, 20);
+}
+
+#[bench]
+pub fn iter_1000_bmap(b: &mut Bencher) {
+    bench_iter_bmap(b, 1000);
+}
+
+#[bench]
+pub fn iter_100000_bmap(b: &mut Bencher) {
+    bench_iter_bmap(b, 100000);
+}

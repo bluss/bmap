@@ -5,6 +5,11 @@ use std::default::Default;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 
+
+#[cfg(test)]
+extern crate rand;
+#[cfg(test)]
+use rand::{Rng, ChaChaRng};
 use std::ops::{
     Index,
 };
@@ -177,11 +182,6 @@ impl<K, V> Entry<K, V>
         let mut keys = self.keys.iter();
         let children = self.children.iter();
         if self.is_leaf() {
-            if !self.parent.is_null() {
-                unsafe {
-                println!("Parent points to: {:?}", (*self.parent).keys);
-                }
-            }
             for key in keys {
                 f(level, key);
             }
@@ -205,7 +205,7 @@ pub struct Bmap<K, V> {
     root: Box<Entry<K, V>>,
 }
 
-use self::Insert::*;
+use self::Insert::{Split, Updated, Inserted};
 enum Insert<K, V> {
     Split((K, V), K, V, Box<Entry<K, V>>),
     Updated(V),
@@ -289,9 +289,8 @@ impl<K, V> Bmap<K, V>
                     // left side: old root
                     // right side: right_child
                     let mut left_child = mem::replace(root, Box::new(Entry::new()));
-                    root.parent = null_mut();
                     left_child.parent = &mut **root;
-                    right_child.parent = &mut **root;
+                    right_child.parent = root.parent;
                     root.insert_in_root(median_k, median_v,
                                         left_child, right_child);
                     kv = kv_;
@@ -360,6 +359,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
             return Some(&entry.keys[index]);
         } else {
             let last_key = entry.keys.last().unwrap();
+            self.index = 0;
             loop {
                 entry = match unsafe { Iter::parent_of(entry) } {
                     None => break,
@@ -370,15 +370,14 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
                 if lower_bound == entry.keys.len() {
                     continue; // continue popping upwards
                 }
-                let next_key = Some(&entry.keys[lower_bound]);
+                let next_key = &entry.keys[lower_bound];
                 // dig down to successor
-                self.index = 0;
                 entry = &entry.children[lower_bound + 1];
                 while !entry.is_leaf() {
                     entry = &entry.children[0];
                 }
                 self.entry = entry;
-                return next_key;
+                return Some(next_key);
             }
         }
         None
@@ -403,6 +402,7 @@ fn test_new() {
     for elt in bp.iter() {
         println!("Iter: {:?}", elt);
     }
+    assert_eq!(bp.iter().count(), bp.len());
     println!("{:?}", bp);
 
     let mut bp = Bmap::new();
@@ -430,6 +430,30 @@ fn test_insert() {
     }
     for x in 0..100 {
         assert!(bp.contains(&x));
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn test_fuzz() {
+    let mut rng: ChaChaRng = rand::random();
+    const N: usize = 149;
+    let mut keys: Vec<_> = (0..N).collect();
+    rng.shuffle(&mut keys);
+
+    let mut m = Bmap::new();
+    for &key in &keys {
+        m.insert(key, ());
+    }
+
+    for &key in &keys {
+        assert!(m.contains(&key));
+    }
+
+    keys.sort();
+    assert_eq!(m.iter().count(), keys.len());
+    for (key, map_key) in keys.iter().zip(m.iter()) {
+        assert_eq!(key, map_key);
     }
 }
 
