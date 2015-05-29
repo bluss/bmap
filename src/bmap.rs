@@ -4,7 +4,7 @@ use std::ptr::null_mut;
 use std::default::Default;
 use std::borrow::Borrow;
 use std::fmt::Debug;
-
+use std::slice;
 
 #[cfg(test)]
 extern crate rand;
@@ -13,6 +13,8 @@ use rand::{Rng, ChaChaRng};
 use std::ops::{
     Index,
 };
+
+use unreachable::debug_assert_unreachable;
 
 const MAX_ORDER: usize = 12;
 
@@ -335,7 +337,8 @@ impl<K: Ord, V> Default for Bmap<K, V> {
 
 pub struct Iter<'a, K: 'a + Ord, V: 'a> {
     entry: &'a Entry<K, V>,
-    index: usize,
+    keyiter: slice::Iter<'a, K>,
+    valiter: slice::Iter<'a, V>,
 }
 
 fn new_iter<K: Ord, V>(map: &Bmap<K, V>) -> Iter<K, V> {
@@ -346,26 +349,21 @@ fn new_iter<K: Ord, V>(map: &Bmap<K, V>) -> Iter<K, V> {
     }
     Iter {
         entry: entry,
-        index: 0,
+        keyiter: entry.keys.iter(),
+        valiter: entry.values.iter(),
     }
 }
 
-impl<'a, K: Ord, V> Iter<'a, K, V> where K: Debug {
-    fn slow_part(&mut self) -> Option<<Self as Iterator>::Item> {
+impl<'a, K: Ord, V> Iter<'a, K, V> {
+    fn next_switch_node(&mut self) -> Option<<Self as Iterator>::Item> {
         let mut entry = self.entry;
-        self.index = 0;
         loop {
             let child = entry;
+            let i = child.position;
             entry = match unsafe { entry.parent() } {
                 None => break,
                 Some(parent) => parent,
             };
-            let i = child.position;
-            /*
-            println!("{:?} pos={}, child={:?}, parent={:?}", child as *const Entry<K, V>,
-                     i, child.keys, entry.keys);
-            println!("{:?}", child as *const _ == &*entry.children[i] as *const _);
-            */
             debug_assert!(i <= entry.keys.len());
             debug_assert!(child as *const _ == &*entry.children[i] as *const _);
             if i == entry.keys.len() {
@@ -373,11 +371,14 @@ impl<'a, K: Ord, V> Iter<'a, K, V> where K: Debug {
             }
             let next_key = &entry.keys[i];
             let next_value = &entry.values[i];
+
             // dig down to successor
             entry = &entry.children[i + 1];
             while !entry.is_leaf() {
                 entry = &entry.children[0];
             }
+            self.keyiter = entry.keys.iter();
+            self.valiter = entry.values.iter();
             self.entry = entry;
             return Some((next_key, next_value));
         }
@@ -385,19 +386,21 @@ impl<'a, K: Ord, V> Iter<'a, K, V> where K: Debug {
     }
 }
 
-impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> where K: Debug {
+impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let entry = self.entry;
-        debug_assert!(entry.is_leaf());
-        let index = self.index;
-        if index != entry.keys.len() {
-            self.index += 1;
-            Some((&entry.keys[index], &entry.values[index]))
+        debug_assert!(self.entry.is_leaf());
+        if let Some(key) = self.keyiter.next() {
+            unsafe {
+                match self.valiter.next() {
+                    Some(value) => Some((key, value)),
+                    None => debug_assert_unreachable(), // key, value pairs
+                }
+            }
         } else {
-            self.slow_part()
+            self.next_switch_node()
         }
     }
 }
