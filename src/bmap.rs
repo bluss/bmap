@@ -324,7 +324,6 @@ impl<K, V> Entry<K, V>
     /// Return **true** if **self** was emptied
     fn merge_siblings(self: &mut Entry<K, V>, pos: usize) -> bool {
         // FIXME: We might kill the parent
-        println!("Merge! order={}, pos={}", self.order(), pos);
         let pkey = self.keys.remove(pos).unwrap();
         let pval = self.values.remove(pos).unwrap();
         let right_child = *self.children.remove(pos + 1).unwrap();
