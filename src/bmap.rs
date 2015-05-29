@@ -17,7 +17,9 @@ use std::ops::{
 
 use unreachable::debug_assert_unreachable;
 
-const MAX_ORDER: usize = 6;
+// B=6, and MAX_ORDER = 2 * B in Btreemap
+
+const MAX_ORDER: usize = 12;
 const MIN_ORDER: usize = MAX_ORDER / 2;
 
 /// Safe to use with any wholly initialized memory `ptr`
