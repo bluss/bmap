@@ -354,16 +354,11 @@ impl<K, V> Entry<K, V>
                     }));
         }
         if removed_root {
-            println!("Merge removed parent");
             // this is the new root
             let mut left_child = self.children.pop().unwrap();
             left_child.parent = self.parent;
             left_child.position = self.position;
             mem::replace(self, *left_child);
-            for key in &self.keys {
-                print!("{:?}, ", unsafe { raw_byte_repr(key) });
-            }
-            println!("");
             let parent_ptr = self as *mut _;
             for child in &mut self.children {
                 child.parent = parent_ptr;
