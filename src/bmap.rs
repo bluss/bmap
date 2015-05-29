@@ -537,7 +537,11 @@ impl<K, V> Bmap<K, V>
             } else if entry.is_leaf() {
                 return None
             } else if entry.children[pos].order() == entry.this_min_order() {
-                // Don't step into a node with minimal order
+                /* if we step into a node of min order, then we fix it up by one of:
+                 * A. rotating in the max element of the lower sibling
+                 * B. rotating in the least element of the higher sibling
+                 * C. merging with sibling and a parent element
+                 */
                 if pos > 0 && entry.children[pos - 1].order() > entry.this_min_order() {
                     entry.rotate_left_to_right(pos - 1);
                 } else if pos + 1 < entry.children.len()
