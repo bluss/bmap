@@ -266,7 +266,7 @@ impl<K, V> Entry<K, V>
     }
 
     fn insert_first(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
-        debug_assert!(self.order() != Self::max_order());
+        debug_assert!(!self.full());
         self.keys.insert(0, key);
         self.values.insert(0, value);
         if let Some(mut child) = child {
@@ -280,8 +280,8 @@ impl<K, V> Entry<K, V>
     }
 
     fn insert_last(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
+        debug_assert!(!self.full());
         let order = self.order();
-        debug_assert!(order != Self::max_order());
         self.keys.push(key);
         self.values.push(value);
         if let Some(mut child) = child {
@@ -479,7 +479,6 @@ impl<K, V> Bmap<K, V>
     fn remove_key(mut entry: &mut Entry<K, V>, key: &K) -> Option<(K, V)> {
         loop {
             let (has_key, mut pos) = entry.find(key);
-            println!("has={:?}, pos={}", has_key, pos);
             if has_key {
                 if entry.is_leaf() {
                     return Some(entry.remove_at(pos));
@@ -502,14 +501,14 @@ impl<K, V> Bmap<K, V>
                     entry.rotate_left_to_right(pos);
                     pos += 1;
                 } else {
-                    println!("Both children full");
                     // Strategy: Swap with predecessor, always in a leaf
+                    //
                     let (mut pred_key, mut pred_value);
                     {
                         // FIXME: Need real delete traversal to keep invariants
                         let mut iter = &mut entry.children[pos];
                         let rm = Self::remove_key(iter, key);
-                        assert!(rm.is_none());
+                        debug_assert!(rm.is_none());
                         while !iter.is_leaf() {
                             iter = {iter}.children.last_mut().unwrap();
                         }
@@ -522,48 +521,29 @@ impl<K, V> Bmap<K, V>
                 }
 
             } else if entry.is_leaf() {
-                println!("Gave up in leaf with {} keys", entry.keys.len());
-                for key in &entry.keys {
-                    print!("{:?}, ", unsafe { raw_byte_repr(key) });
-                }
-                println!("");
                 return None
             } else if entry.children[pos].order() == MIN_ORDER {
                 // Don't step into a node with minimal order
-                let mut i = pos;
-                if i > 0 && entry.children[i - 1].order() > MIN_ORDER {
-                    //i -= 1;
-                    entry.rotate_left_to_right(i - 1);
-                } else if i + 1 < entry.children.len() && entry.children[i + 1].order() > MIN_ORDER {
-                    entry.rotate_right_to_left(i);
+                if pos > 0 && entry.children[pos - 1].order() > MIN_ORDER {
+                    entry.rotate_left_to_right(pos - 1);
+                } else if pos + 1 < entry.children.len() && entry.children[pos + 1].order() > MIN_ORDER {
+                    entry.rotate_right_to_left(pos);
                 } else {
-                    if i > 0 { i -= 1 }
-                    if entry.merge_siblings(i) {
+                    if pos > 0 { pos -= 1 }
+                    if entry.merge_siblings(pos) {
                         return Self::remove_key(entry, key);
                     }
-                    pos = i;
                 }
             } else {
                 debug_assert!(entry.children[pos].order() >= MIN_ORDER);
             }
-            let next;
-            if entry.is_leaf() {
-                println!("In merged case");
-                // was made a leaf by merging!
-                next = entry;
+
+            if !entry.is_leaf() {
+                entry = &mut {entry}.children[pos];
+                debug_assert!(entry.order() >= MIN_ORDER);
             } else {
-                next = &mut {entry}.children[pos];
-                // can't assert this for the root
-                assert!(next.order() >= MIN_ORDER);
+                // entry was made a leaf by merging, go over it again.
             }
-
-            entry = next;
-
-            print!("continuing to ");
-            for key in &entry.keys {
-                print!("{:?}, ", unsafe { raw_byte_repr(key) });
-            }
-            println!("");
         }
     }
 
