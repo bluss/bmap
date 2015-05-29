@@ -9,6 +9,7 @@ version = "0.3.4"
 
 [dev-dependencies]
 rand = "*"
+itertools = "0.3.11"
 
 [profile.bench]
 #lto = false

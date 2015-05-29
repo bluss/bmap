@@ -10,6 +10,11 @@ use std::slice;
 extern crate rand;
 #[cfg(test)]
 use rand::{Rng, ChaChaRng, SeedableRng};
+#[cfg(test)]
+extern crate itertools as it;
+
+
+
 use std::ops::{
     Index,
 };
@@ -38,9 +43,22 @@ struct Entry<K, V> {
     position: usize,
 }
 
-impl<K, V> Entry<K, V>
-    where K: Ord
+/// WARNING: Needs to update parent after cloning.
+impl<K, V> Clone for Entry<K, V>
+    where K: Clone, V: Clone,
 {
+    fn clone(&self) -> Self {
+        Entry {
+            keys: self.keys.clone(),
+            values: self.values.clone(),
+            children: self.children.clone(),
+            parent: null_mut(),
+            position: self.position,
+        }
+    }
+}
+
+impl<K, V> Entry<K, V> {
     fn new() -> Self {
         Entry {
             keys: ArrayVec::new(),
@@ -95,7 +113,7 @@ impl<K, V> Entry<K, V>
 
     /// Return (is_equal, best_position)
     fn find<Q: ?Sized>(&self, key: &Q) -> (bool, usize)
-        where K: Borrow<Q>,
+        where K: Ord + Borrow<Q>,
               Q: Ord,
     {
         // FIXME: Find out a good cutoff for binary search
@@ -121,7 +139,7 @@ impl<K, V> Entry<K, V>
     }
 
     fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
-        where K: Borrow<Q>,
+        where K: Ord + Borrow<Q>,
               Q: Ord,
     {
         let (has, lower_bound) = self.find(key);
@@ -135,7 +153,7 @@ impl<K, V> Entry<K, V>
     }
 
     fn find_value<Q: ?Sized>(&self, key: &Q) -> Option<&V>
-        where K: Borrow<Q>,
+        where K: Ord + Borrow<Q>,
               Q: Ord,
     {
         let (has, lower_bound) = self.find(key);
@@ -149,7 +167,7 @@ impl<K, V> Entry<K, V>
     }
 
     fn find_value_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
-        where K: Borrow<Q>,
+        where K: Ord + Borrow<Q>,
               Q: Ord,
     {
         let (has, lower_bound) = self.find(key);
@@ -170,14 +188,18 @@ impl<K, V> Entry<K, V>
         &mut self.values[index]
     }
 
-    fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
+    fn insert(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>)
+        where K: Ord
+    {
         let (has, pos) = self.find(&key);
         debug_assert!(!has);
         self.insert_at(pos, key, value, child);
     }
 
     fn insert_at(&mut self, pos: usize, key: K, value: V,
-                 child: Option<Box<Entry<K, V>>>) {
+                 child: Option<Box<Entry<K, V>>>)
+        where K: Ord
+    {
         debug_assert!(!self.full());
         self.keys.insert(pos, key);
         self.values.insert(pos, value);
@@ -193,6 +215,7 @@ impl<K, V> Entry<K, V>
 
     fn insert_in_root(&mut self, key: K, value: V,
                       mut left: Box<Entry<K, V>>, mut right: Box<Entry<K, V>>)
+        where K: Ord
     {
         debug_assert!(self.keys.len() == 0);
         debug_assert!(self.values.len() == 0);
@@ -207,7 +230,9 @@ impl<K, V> Entry<K, V>
         self.children.push(right);
     }
 
-    fn update(&mut self, key: &K, value: V) -> V {
+    fn update(&mut self, key: &K, value: V) -> V
+        where K: Ord
+    {
         let (has, pos) = self.find(key);
         debug_assert!(has);
         let existing = mem::replace(self.value_at_mut(pos), value);
@@ -242,6 +267,16 @@ impl<K, V> Entry<K, V>
             }
         }
     }
+
+    /// Recursively fixup all parent pointers
+    fn fixup_parents(&mut self) {
+        let self_ptr = self as *mut _;
+        for child in &mut self.children {
+            child.fixup_parents();
+            child.parent = self_ptr;
+        }
+    }
+
 
     // -----------
     // DELETION
@@ -373,6 +408,19 @@ impl<K, V> Entry<K, V>
 pub struct Bmap<K, V> {
     length: usize,
     root: Box<Entry<K, V>>,
+}
+
+impl<K, V> Clone for Bmap<K, V>
+    where K: Clone, V: Clone
+{
+    fn clone(&self) -> Self {
+        let mut map = Bmap {
+            length: self.length,
+            root: self.root.clone(),
+        };
+        map.root.fixup_parents();
+        map
+    }
 }
 
 use self::Insert::{Split, Updated, Inserted};
@@ -948,5 +996,31 @@ fn test_remove() {
     let removed = bp.remove(&root_key);
     //println!("{:#?}", bp);
     assert_eq!(removed, Some(root_key));
+}
+
+
+#[cfg(test)]
+fn create_random_tree<R, S>(max_size: usize) -> Bmap<R, S>
+    where R: rand::Rand + Ord, S: rand::Rand
+{
+    let mut rng: ChaChaRng = rand::random();
+
+    let size = rng.gen_range(0, max_size);
+    let keys: Vec<_> = rng.gen_iter::<R>().take(size).collect();
+    let values: Vec<_> = rng.gen_iter::<S>().take(size).collect();
+
+    let mut m = Bmap::new();
+    for (k, v) in keys.into_iter().zip(values) {
+        m.insert(k, v);
+    }
+    m
+}
+
+#[test]
+fn test_clone() {
+    let t1 = create_random_tree::<i32, i32>(512);
+    let t2 = t1.clone();
+
+    it::assert_equal(t1.iter(), t2.iter());
 }
 
