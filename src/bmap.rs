@@ -553,7 +553,8 @@ impl<K, V> Bmap<K, V>
                 // Don't step into a node with minimal order
                 if pos > 0 && entry.children[pos - 1].order() > entry.this_min_order() {
                     entry.rotate_left_to_right(pos - 1);
-                } else if pos + 1 < entry.children.len() && entry.children[pos + 1].order() > entry.this_min_order() {
+                } else if pos + 1 < entry.children.len()
+                    && entry.children[pos + 1].order() > entry.this_min_order() {
                     entry.rotate_right_to_left(pos);
                 } else {
                     if pos > 0 { pos -= 1 }
@@ -561,8 +562,6 @@ impl<K, V> Bmap<K, V>
                         continue;
                     }
                 }
-            } else {
-                debug_assert!(entry.children[pos].order() >= entry.this_min_order());
             }
 
             debug_assert!(!entry.is_leaf());
