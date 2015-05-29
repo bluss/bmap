@@ -52,7 +52,7 @@ impl<K, V> Entry<K, V>
     }
 
     fn max_order() -> usize { MAX_ORDER }
-    fn min_order(&self) -> usize { MIN_ORDER }
+    fn min_order() -> usize { MIN_ORDER }
     fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
 
     fn order(&self) -> usize { self.keys.len() + 1 }
@@ -241,66 +241,83 @@ impl<K, V> Entry<K, V>
         }
     }
 
+    // -----------
+    // DELETION
+    // -----------
 
-    fn rotate_right_to_left(self: &mut Entry<K, V>, pos: usize) {
-        println!("Rotate right to left");
+    fn remove_first(&mut self) -> (K, V, Option<Box<Entry<K, V>>>) {
+        debug_assert!(self.order() > Self::min_order());
+        let rkey = self.keys.remove(0).unwrap();
+        let rval = self.values.remove(0).unwrap();
+        let child = self.children.remove(0);
+        for other in &mut self.children {
+            other.position -= 1;
+        }
+        (rkey, rval, child)
+    }
+
+    fn remove_last(&mut self) -> (K, V, Option<Box<Entry<K, V>>>) {
+        debug_assert!(self.order() > Self::min_order());
+        let key = self.keys.pop().unwrap();
+        let val = self.values.pop().unwrap();
+        let child = self.children.pop();
+        (key, val, child)
+    }
+
+    fn insert_first(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
+        debug_assert!(self.order() != Self::max_order());
+        self.keys.insert(0, key);
+        self.values.insert(0, value);
+        if let Some(mut child) = child {
+            for other in &mut self.children {
+                other.position += 1;
+            }
+            child.parent = self;
+            child.position = 0;
+            self.children.insert(0, child);
+        }
+    }
+
+    fn insert_last(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
+        let order = self.order();
+        debug_assert!(order != Self::max_order());
+        self.keys.push(key);
+        self.values.push(value);
+        if let Some(mut child) = child {
+            child.parent = self;
+            child.position = order;
+            self.children.push(child);
+        }
+    }
+
+    fn rotate_right_to_left(&mut self, pos: usize) {
         /* rotate key and child from right to left
          *      [B]                [C]
          *     /   \     to       /   \
          *   [A]   [C D]      [A B]   [D]   **/
         /* i: key index in parent */
-        let (rkey, rval, child);
-        {
-            let rchild = &mut self.children[pos + 1];
-            rkey = rchild.keys.remove(0).unwrap();
-            rval = rchild.values.remove(0).unwrap();
-            child = rchild.children.remove(0);
-            for other in &mut rchild.children {
-                other.position -= 1;
-            }
-        }
+        let (rkey, rval, child) = self.children[pos + 1].remove_first();
 
         // replace parent key
         let pkey = mem::replace(&mut self.keys[pos], rkey);
         let pval = mem::replace(&mut self.values[pos], rval);
-        let left_child = &mut *self.children[pos];
-        let left_order = left_child.order();
-        left_child.keys.push(pkey);
-        left_child.values.push(pval);
-        if let Some(mut child) = child {
-            child.parent = left_child;
-            child.position = left_order;
-            left_child.children.push(child);
-        }
+        self.children[pos].insert_last(pkey, pval, child);
     }
 
-    fn rotate_left_to_right(self: &mut Entry<K, V>, pos: usize) {
-        println!("Rotate left to right");
-        let (lkey, lval, child);
-        {
-            let lchild = &mut self.children[pos];
-            assert!(lchild.order() >= MIN_ORDER);
-            lkey = lchild.keys.pop().unwrap();
-            lval = lchild.values.pop().unwrap();
-            child = lchild.children.pop();
-        }
+    fn rotate_left_to_right(&mut self, pos: usize) {
+        /* rotate key and child from left to right
+         *       pos               pos
+         *       v                 v
+         *   [...C..]          [...B..]
+         *      / \     to        / \
+         * [A B]   [D]         [A]   [C D]       **/
+        let (lkey, lval, child) = self.children[pos].remove_last();
+
         // replace parent key
         let pkey = mem::replace(&mut self.keys[pos], lkey);
         let pval = mem::replace(&mut self.values[pos], lval);
-        self.children[pos + 1].keys.insert(0, pkey);
-        self.children[pos + 1].values.insert(0, pval);
-        if let Some(mut child) = child {
-            let parent = &mut *self.children[pos + 1];
-            for other in &mut parent.children {
-                other.position += 1;
-            }
-            child.parent = parent;
-            child.position = 0;
-            parent.children.insert(0, child);
-        }
+        self.children[pos + 1].insert_first(pkey, pval, child);
     }
-
-
 
     /// Return **true** if **self** was emptied
     fn merge_siblings(self: &mut Entry<K, V>, pos: usize) -> bool {
