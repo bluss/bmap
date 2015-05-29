@@ -1,8 +1,9 @@
 use arrayvec::ArrayVec;
 use std::mem;
-//use std::ptr;
+use std::ptr::null_mut;
 use std::default::Default;
 use std::borrow::Borrow;
+use std::fmt::Debug;
 
 use std::ops::{
     Index,
@@ -15,6 +16,7 @@ struct Entry<K, V> {
     keys: ArrayVec<[K; MAX_ORDER - 1]>,
     values: ArrayVec<[V; MAX_ORDER - 1]>,
     children: ArrayVec<[Box<Entry<K, V>>; MAX_ORDER]>,
+    parent: *mut Entry<K, V>,
 }
 
 impl<K, V> Entry<K, V>
@@ -25,6 +27,7 @@ impl<K, V> Entry<K, V>
             keys: ArrayVec::new(),
             values: ArrayVec::new(),
             children: ArrayVec::new(),
+            parent: null_mut(),
         }
     }
 
@@ -53,6 +56,10 @@ impl<K, V> Entry<K, V>
         let median_value = self.values.pop().unwrap();
         if !self.is_leaf() {
             right.children.extend(self.children.drain(1 + Self::median_key_index()..));
+            let right_parent: *mut _ = &mut *right;
+            for child in &mut right.children {
+                child.parent = right_parent;
+            }
         }
         (median_key, median_value, right)
     }
@@ -164,10 +171,17 @@ impl<K, V> Entry<K, V>
     }
 
     /// in order visit of the btree
-    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K)) {
+    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K))
+        where K: Debug, V: Debug,
+    {
         let mut keys = self.keys.iter();
         let children = self.children.iter();
         if self.is_leaf() {
+            if !self.parent.is_null() {
+                unsafe {
+                println!("Parent points to: {:?}", (*self.parent).keys);
+                }
+            }
             for key in keys {
                 f(level, key);
             }
@@ -256,7 +270,8 @@ impl<K, V> Bmap<K, V>
                 }
 
                 match insert_key(&mut entry.children[best_pos], kv) {
-                    Split(kv_, median_k, median_v, right_child) => {
+                    Split(kv_, median_k, median_v, mut right_child) => {
+                        right_child.parent = &mut **entry;
                         entry.insert(median_k, median_v, Some(right_child));
                         kv = kv_;
                     }
@@ -269,11 +284,14 @@ impl<K, V> Bmap<K, V>
         loop {
             let root = &mut self.root;
             match insert_key(root, kv) {
-                Split(kv_, median_k, median_v, right_child) => {
+                Split(kv_, median_k, median_v, mut right_child) => {
                     // Root was split, replace it with a new empty node,
                     // left side: old root
                     // right side: right_child
-                    let left_child = mem::replace(root, Box::new(Entry::new()));
+                    let mut left_child = mem::replace(root, Box::new(Entry::new()));
+                    root.parent = null_mut();
+                    left_child.parent = &mut **root;
+                    right_child.parent = &mut **root;
                     root.insert_in_root(median_k, median_v,
                                         left_child, right_child);
                     kv = kv_;
@@ -282,6 +300,10 @@ impl<K, V> Bmap<K, V>
                 Inserted => { self.length += 1; return None }
             }
         }
+    }
+
+    pub fn iter(&self) -> Iter<K, V> {
+        new_iter(self)
     }
 }
 
@@ -299,22 +321,89 @@ impl<K: Ord, V> Default for Bmap<K, V> {
     fn default() -> Self { Bmap::new() }
 }
 
+pub struct Iter<'a, K: 'a + Ord, V: 'a> {
+    entry: &'a Entry<K, V>,
+    index: usize,
+}
+
+fn new_iter<K: Ord, V>(map: &Bmap<K, V>) -> Iter<K, V> {
+    // find and focus the lower bound
+    let mut entry = &map.root;
+    while !entry.is_leaf() {
+        entry = &entry.children[0];
+    }
+    Iter {
+        entry: entry,
+        index: 0,
+    }
+}
+
+impl<'a, K: Ord, V> Iter<'a, K, V> {
+    unsafe fn parent_of(entry: &Entry<K, V>) -> Option<&Entry<K, V>> {
+        if entry.parent.is_null() {
+            None
+        } else {
+            Some(&*entry.parent)
+        }
+    }
+}
+
+impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
+    type Item = &'a K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut entry = self.entry;
+        debug_assert!(entry.is_leaf());
+        let index = self.index;
+        if index < entry.keys.len() {
+            self.index += 1;
+            return Some(&entry.keys[index]);
+        } else {
+            let last_key = entry.keys.last().unwrap();
+            loop {
+                entry = match unsafe { Iter::parent_of(entry) } {
+                    None => break,
+                    Some(parent) => parent,
+                };
+                let (eq, lower_bound) = entry.find(last_key);
+                debug_assert!(!eq);
+                if lower_bound == entry.keys.len() {
+                    continue; // continue popping upwards
+                }
+                let next_key = Some(&entry.keys[lower_bound]);
+                // dig down to successor
+                self.index = 0;
+                entry = &entry.children[lower_bound + 1];
+                while !entry.is_leaf() {
+                    entry = &entry.children[0];
+                }
+                self.entry = entry;
+                return next_key;
+            }
+        }
+        None
+    }
+}
 
 #[test]
 fn test_new() {
     let mut bp = Bmap::new();
     for x in vec![0, 2, 4, 6, 8, 10, 3, 1, 7, 5, 11, 13] {
         bp.insert(x, ());
-        /*
-        println!("{:?}", bp);
-        bp.root.visit_inorder(0, &mut |indent, key| {
-            for _ in 0..indent {
-                print!("  ");
-            }
-            println!("{:?}", key);
-        });
-        */
     }
+
+    /*
+    bp.root._visit_inorder(0, &mut |indent, key| {
+        for _ in 0..indent {
+            print!("  ");
+        }
+        println!("{:?}", key);
+    });
+    */
+    for elt in bp.iter() {
+        println!("Iter: {:?}", elt);
+    }
+    println!("{:?}", bp);
 
     let mut bp = Bmap::new();
     for x in (0..20) {
