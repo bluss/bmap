@@ -471,7 +471,10 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    fn remove_key(mut entry: &mut Entry<K, V>, key: &K) -> Option<(K, V)> {
+    fn remove_key<Q: ?Sized>(mut entry: &mut Entry<K, V>, key: &Q) -> Option<(K, V)>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         loop {
             let (has_key, mut pos) = entry.find(key);
             if has_key {
@@ -539,8 +542,10 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-
+    pub fn remove<Q: ?Sized>(&mut self, key: &Q) -> Option<V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         let value = Self::remove_key(&mut self.root, key);
         if value.is_some() {
             self.length -= 1;
