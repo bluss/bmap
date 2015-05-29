@@ -9,7 +9,7 @@ use std::slice;
 #[cfg(test)]
 extern crate rand;
 #[cfg(test)]
-use rand::{Rng, ChaChaRng};
+use rand::{Rng, ChaChaRng, SeedableRng};
 use std::ops::{
     Index,
 };
@@ -347,12 +347,10 @@ impl<K, V> Bmap<K, V>
                 }
                 // we need to move the k-v so we can delete them
                 let (lo, ro) = {
-                    println!("Pos: {}, Entry order: {}", pos, entry.order());
                     let left = &entry.children[pos];
                     let right = &entry.children[pos + 1];
                     (left.order(), right.order())
                 };
-                println!("{:?}, {:?}", lo, ro);
                 if lo == MIN_ORDER && lo == ro {
                     println!("Merge!");
                     // Remove key from current entry,
@@ -413,6 +411,7 @@ impl<K, V> Bmap<K, V>
                     let (lkey, lval, child);
                     {
                         let lchild = &mut entry.children[pos];
+                        assert!(lchild.order() >= MIN_ORDER);
                         lkey = lchild.keys.pop().unwrap();
                         lval = lchild.values.pop().unwrap();
                         child = lchild.children.pop();
@@ -435,12 +434,30 @@ impl<K, V> Bmap<K, V>
                     pos += 1;
                 } else {
                     println!("Both children full");
+                    // Strategy: Swap with predecessor, always in a leaf
+                    let (mut pred_key, mut pred_value);
+                    {
+                        // FIXME: Need real delete traversal to keep invariants
+                        let mut iter = &mut entry.children[pos];
+                        while !iter.is_leaf() {
+                            iter = {iter}.children.last_mut().unwrap();
+                        }
+                        pred_key = iter.keys.pop().unwrap();
+                        pred_value = iter.values.pop().unwrap();
+                    }
+                    mem::replace(&mut entry.keys[pos], pred_key);
+                    let value = mem::replace(&mut entry.values[pos], pred_value);
+                    return Some(value);
                 }
 
             } else if entry.is_leaf() {
                 return None
             } 
-            entry = &mut {entry}.children[pos];
+            let next = &mut {entry}.children[pos];
+
+            //assert!(next.order() >= MIN_ORDER);
+
+            entry = next;
         }
     }
 
@@ -635,10 +652,23 @@ fn test_fuzz() {
 //#[cfg(test)]
 #[test]
 fn test_fuzz_remove() {
-    let mut rng: ChaChaRng = rand::random();
+    let mut input_seed = None;
 
-    const MAX: usize = 100; // max test size
-    const NTEST: usize = 10;
+    let seed = match input_seed {
+        Some(inner) => inner,
+        None => {
+            let mut seed_ = [0_u32; 4];
+            for s in &mut seed_ {
+                *s = rand::random();
+            }
+            seed_
+        }
+    };
+    println!("Seed: {:?}", seed);
+    let mut rng = ChaChaRng::from_seed(&seed);
+
+    const MAX: usize = 1000; // max test size
+    const NTEST: usize = 1000;
     type Key = i8;
     for _ in 0..NTEST {
         let size = rng.gen_range(0, MAX);
