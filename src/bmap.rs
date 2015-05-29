@@ -16,7 +16,7 @@ use std::ops::{
 
 use unreachable::debug_assert_unreachable;
 
-const MAX_ORDER: usize = 12;
+const MAX_ORDER: usize = 6;
 const MIN_ORDER: usize = MAX_ORDER / 2;
 
 #[derive(Debug)]
@@ -347,6 +347,7 @@ impl<K, V> Bmap<K, V>
                 }
                 // we need to move the k-v so we can delete them
                 let (lo, ro) = {
+                    println!("Pos: {}, Entry order: {}", pos, entry.order());
                     let left = &entry.children[pos];
                     let right = &entry.children[pos + 1];
                     (left.order(), right.order())
@@ -382,23 +383,55 @@ impl<K, V> Bmap<K, V>
                                     child
                                 }));
                     }
-
                 } else if ro > MIN_ORDER && lo != MAX_ORDER {
                     /* rotate key and child from right to left
                      *      [B]                [C]
                      *     /   \     to       /   \
                      *   [A]   [C D]      [A B]   [D]   **/
                     /* i: key index in parent */
-                    let rkey = entry.children[pos + 1].keys.remove(0).unwrap();
-                    let rval = entry.children[pos + 1].values.remove(0).unwrap();
+                    let (rkey, rval, child);
+                    {
+                        let rchild = &mut entry.children[pos + 1];
+                        rkey = rchild.keys.remove(0).unwrap();
+                        rval = rchild.values.remove(0).unwrap();
+                        child = rchild.children.remove(0);
+                    }
+
                     // replace parent key
                     let pkey = mem::replace(&mut entry.keys[pos], rkey);
                     let pval = mem::replace(&mut entry.values[pos], rval);
                     entry.children[pos].keys.push(pkey);
                     entry.children[pos].values.push(pval);
+                    if let Some(mut child) = child {
+                        child.parent = &mut *entry.children[pos];
+                        child.position = entry.children[pos].order();
+                        entry.children[pos].children.push(child);
+                    }
                     println!("Rotate right to left");
                 } else if ro != MAX_ORDER {
                     println!("Rotate left to right");
+                    let (lkey, lval, child);
+                    {
+                        let lchild = &mut entry.children[pos];
+                        lkey = lchild.keys.pop().unwrap();
+                        lval = lchild.values.pop().unwrap();
+                        child = lchild.children.pop();
+                    }
+                    // replace parent key
+                    let pkey = mem::replace(&mut entry.keys[pos], lkey);
+                    let pval = mem::replace(&mut entry.values[pos], lval);
+                    entry.children[pos + 1].keys.insert(0, pkey);
+                    entry.children[pos + 1].values.insert(0, pval);
+                    if let Some(mut child) = child {
+                        for other in &mut entry.children {
+                            other.position += 1;
+                        }
+                        child.parent = &mut *entry.children[pos + 1];
+                        child.position = 0;
+                        entry.children[pos + 1].children.insert(0, child);
+                    }
+
+
                     pos += 1;
                 } else {
                     println!("Both children full");
@@ -599,6 +632,66 @@ fn test_fuzz() {
     }
 }
 
+//#[cfg(test)]
+#[test]
+fn test_fuzz_remove() {
+    let mut rng: ChaChaRng = rand::random();
+
+    const MAX: usize = 100; // max test size
+    const NTEST: usize = 10;
+    type Key = i8;
+    for _ in 0..NTEST {
+        let size = rng.gen_range(0, MAX);
+        let mut keys: Vec<_> = rng.gen_iter::<Key>().take(size).collect();
+
+        let mut m = Bmap::new();
+        for &key in &keys {
+            m.insert(key, ());
+        }
+
+        // check that all keys are present
+        for &key in &keys {
+            assert!(m.contains(&key));
+        }
+        keys.sort();
+        keys.dedup();
+        assert_eq!(m.iter().count(), keys.len());
+        for (key, (map_key, _)) in keys.iter().zip(m.iter()) {
+            assert_eq!(key, map_key);
+        }
+
+        let rm_size = rng.gen_range(0, MAX / 2);
+        let mut removals: Vec<_> = rng.gen_iter::<Key>().take(rm_size).collect();
+        removals.sort();
+        removals.dedup();
+        rng.shuffle(&mut removals);
+        println!("Keys: {:?}", keys);
+        println!("Removals: {:?}", removals);
+
+        // containment check
+        for &rkey in &removals {
+            assert_eq!(m.contains(&rkey), keys.contains(&rkey));
+        }
+
+        // remove check
+        // keys is deduplicated here
+        let mut n_present = 0;
+        for &rkey in &removals {
+            let removed = m.remove(&rkey);
+            let is_present = keys.contains(&rkey);
+            if is_present {
+                n_present += 1;
+            }
+            if removed.is_some() != is_present {
+                println!("Failed to remove key: {}", rkey);
+                println!("Tree: {:#?}", m);
+            }
+            assert_eq!(removed.is_some(), is_present);
+        }
+        assert_eq!(m.len(), keys.len() - n_present);
+    }
+}
+
 #[macro_export]
 /// Create a **Bmap** from a list of key-value pairs
 ///
@@ -714,6 +807,29 @@ fn test_remove() {
     assert!(!bp.root.is_leaf());
     let removed = bp.remove(&root_key);
     println!("{:#?}", bp);
+    assert_eq!(removed, Some(root_key));
+
+    // Both children full case
+    let max_keys = MAX_ORDER - 1;
+    let mut bp = bmap!();
+    let n = max_keys * 2 + 1;
+    let mut keyiter = 0 .. (2 * max_keys + 1);
+
+    let mid = max_keys + 1;
+    bp.insert(mid, mid);
+    
+    for (index, x) in (0..mid).rev().enumerate() {
+        let index = 2 * index + 1;
+        bp.insert(x, x);
+        bp.insert(x + index, x + index);
+    }
+
+    println!("{:#?}", bp);
+
+    let root_key = bp.root.keys[0];
+    assert!(!bp.root.is_leaf());
+    let removed = bp.remove(&root_key);
+    //println!("{:#?}", bp);
     assert_eq!(removed, Some(root_key));
 }
 
