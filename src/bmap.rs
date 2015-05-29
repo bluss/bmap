@@ -5,6 +5,7 @@ use std::default::Default;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::slice;
+use std::cmp::max;
 
 #[cfg(test)]
 extern crate rand;
@@ -18,6 +19,15 @@ use unreachable::debug_assert_unreachable;
 
 const MAX_ORDER: usize = 6;
 const MIN_ORDER: usize = MAX_ORDER / 2;
+
+/// Safe to use with any wholly initialized memory `ptr`
+unsafe fn raw_byte_repr<'a, T>(ptr: &'a T) -> &'a [u8]
+{
+    slice::from_raw_parts(
+        ptr as *const _ as *const u8,
+        mem::size_of::<T>(),
+    )
+}
 
 #[derive(Debug)]
 struct Entry<K, V> {
@@ -202,11 +212,11 @@ impl<K, V> Entry<K, V>
         existing
     }
 
-    fn remove_at(&mut self, pos: usize) -> V {
+    fn remove_at(&mut self, pos: usize) -> (K, V) {
         debug_assert!(self.is_leaf());
-        self.keys.remove(pos);
+        let key = self.keys.remove(pos);
         let value = self.values.remove(pos);
-        value.unwrap()
+        (key.unwrap(), value.unwrap())
     }
 
     #[inline]
@@ -337,13 +347,115 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    fn remove_key(mut entry: &mut Entry<K, V>, key: &K) -> Option<V> {
+    fn rotate_right_to_left(entry: &mut Entry<K, V>, pos: usize) {
+        println!("Rotate right to left");
+        /* rotate key and child from right to left
+         *      [B]                [C]
+         *     /   \     to       /   \
+         *   [A]   [C D]      [A B]   [D]   **/
+        /* i: key index in parent */
+        let (rkey, rval, child);
+        {
+            let rchild = &mut entry.children[pos + 1];
+            rkey = rchild.keys.remove(0).unwrap();
+            rval = rchild.values.remove(0).unwrap();
+            child = rchild.children.remove(0);
+        }
+
+        // replace parent key
+        let pkey = mem::replace(&mut entry.keys[pos], rkey);
+        let pval = mem::replace(&mut entry.values[pos], rval);
+        entry.children[pos].keys.push(pkey);
+        entry.children[pos].values.push(pval);
+        if let Some(mut child) = child {
+            child.parent = &mut *entry.children[pos];
+            child.position = entry.children[pos].order();
+            entry.children[pos].children.push(child);
+        }
+    }
+
+    fn rotate_left_to_right(entry: &mut Entry<K, V>, pos: usize) {
+        println!("Rotate left to right");
+        let (lkey, lval, child);
+        {
+            let lchild = &mut entry.children[pos];
+            assert!(lchild.order() >= MIN_ORDER);
+            lkey = lchild.keys.pop().unwrap();
+            lval = lchild.values.pop().unwrap();
+            child = lchild.children.pop();
+        }
+        // replace parent key
+        let pkey = mem::replace(&mut entry.keys[pos], lkey);
+        let pval = mem::replace(&mut entry.values[pos], lval);
+        entry.children[pos + 1].keys.insert(0, pkey);
+        entry.children[pos + 1].values.insert(0, pval);
+        if let Some(mut child) = child {
+            for other in &mut entry.children {
+                other.position += 1;
+            }
+            child.parent = &mut *entry.children[pos + 1];
+            child.position = 0;
+            entry.children[pos + 1].children.insert(0, child);
+        }
+    }
+
+
+
+    /// Return **true** if **entry** was emptied
+    fn merge_siblings(entry: &mut Entry<K, V>, pos: usize) -> bool {
+        // FIXME: We might kill the parent
+        println!("Merge! order={}, pos={}", entry.order(), pos);
+        let pkey = entry.keys.remove(pos).unwrap();
+        let pval = entry.values.remove(pos).unwrap();
+        let right_child = *entry.children.remove(pos + 1).unwrap();
+        //assert!(entry.keys.len() > 0);
+        let removed_root = entry.keys.len() == 0;
+        for child in &mut entry.children[pos + 1..] {
+            // FIXME position
+            //child.position -= 1;
+        }
+        {
+            let left_child = &mut entry.children[pos];
+            let (keys, values, children) = match right_child {
+                Entry { keys, values, children, .. } =>
+                    (keys, values, children)
+            };
+            let len = left_child.order();
+            left_child.keys.push(pkey);
+            left_child.keys.extend(keys);
+            left_child.values.push(pval);
+            left_child.values.extend(values);
+            let parent_ptr: *mut Entry<_, _> = &mut **left_child;
+            left_child.children.extend(
+                children.into_iter()
+                    .map(|mut child| {
+                        child.position += len;
+                        child.parent = parent_ptr;
+                        child
+                    }));
+        }
+        if removed_root {
+            println!("Merge removed parent");
+            // this is the new root
+            let mut left_child = entry.children.pop().unwrap();
+            left_child.parent = null_mut();
+            left_child.position = 0;
+            mem::replace(entry, *left_child);
+            for key in &entry.keys {
+                print!("{:?}, ", unsafe { raw_byte_repr(key) });
+            }
+            println!("");
+        }
+        removed_root
+    }
+
+    fn remove_key(mut entry: &mut Entry<K, V>, key: &K) -> Option<(K, V)> {
         loop {
             let (has_key, mut pos) = entry.find(key);
+            println!("has={:?}, pos={}", has_key, pos);
             if has_key {
                 if entry.is_leaf() {
-                    let value = entry.remove_at(pos);
-                    return Some(value);
+                    return Some(entry.remove_at(pos));
                 }
                 // we need to move the k-v so we can delete them
                 let (lo, ro) = {
@@ -352,85 +464,15 @@ impl<K, V> Bmap<K, V>
                     (left.order(), right.order())
                 };
                 if lo == MIN_ORDER && lo == ro {
-                    println!("Merge!");
                     // Remove key from current entry,
                     // and merge the children
-                    let pkey = entry.keys.remove(pos).unwrap();
-                    let pval = entry.values.remove(pos).unwrap();
-                    let right_child = *entry.children.remove(pos + 1).unwrap();
-                    for child in &mut entry.children[pos + 1..] {
-                        child.position -= 1;
-                    }
-                    {
-                        let left_child = &mut entry.children[pos];
-                        let (keys, values, children) = match right_child {
-                            Entry { keys, values, children, .. } =>
-                                (keys, values, children)
-                        };
-                        let len = left_child.order();
-                        left_child.keys.push(pkey);
-                        left_child.keys.extend(keys);
-                        left_child.values.push(pval);
-                        left_child.values.extend(values);
-                        let parent_ptr: *mut Entry<_, _> = &mut **left_child;
-                        left_child.children.extend(
-                            children.into_iter()
-                                .map(|mut child| {
-                                    child.position += len;
-                                    child.parent = parent_ptr;
-                                    child
-                                }));
+                    if Self::merge_siblings(entry, pos) {
+                        return Self::remove_key(entry, key);
                     }
                 } else if ro > MIN_ORDER && lo != MAX_ORDER {
-                    /* rotate key and child from right to left
-                     *      [B]                [C]
-                     *     /   \     to       /   \
-                     *   [A]   [C D]      [A B]   [D]   **/
-                    /* i: key index in parent */
-                    let (rkey, rval, child);
-                    {
-                        let rchild = &mut entry.children[pos + 1];
-                        rkey = rchild.keys.remove(0).unwrap();
-                        rval = rchild.values.remove(0).unwrap();
-                        child = rchild.children.remove(0);
-                    }
-
-                    // replace parent key
-                    let pkey = mem::replace(&mut entry.keys[pos], rkey);
-                    let pval = mem::replace(&mut entry.values[pos], rval);
-                    entry.children[pos].keys.push(pkey);
-                    entry.children[pos].values.push(pval);
-                    if let Some(mut child) = child {
-                        child.parent = &mut *entry.children[pos];
-                        child.position = entry.children[pos].order();
-                        entry.children[pos].children.push(child);
-                    }
-                    println!("Rotate right to left");
+                    Self::rotate_right_to_left(entry, pos);
                 } else if ro != MAX_ORDER {
-                    println!("Rotate left to right");
-                    let (lkey, lval, child);
-                    {
-                        let lchild = &mut entry.children[pos];
-                        assert!(lchild.order() >= MIN_ORDER);
-                        lkey = lchild.keys.pop().unwrap();
-                        lval = lchild.values.pop().unwrap();
-                        child = lchild.children.pop();
-                    }
-                    // replace parent key
-                    let pkey = mem::replace(&mut entry.keys[pos], lkey);
-                    let pval = mem::replace(&mut entry.values[pos], lval);
-                    entry.children[pos + 1].keys.insert(0, pkey);
-                    entry.children[pos + 1].values.insert(0, pval);
-                    if let Some(mut child) = child {
-                        for other in &mut entry.children {
-                            other.position += 1;
-                        }
-                        child.parent = &mut *entry.children[pos + 1];
-                        child.position = 0;
-                        entry.children[pos + 1].children.insert(0, child);
-                    }
-
-
+                    Self::rotate_left_to_right(entry, pos);
                     pos += 1;
                 } else {
                     println!("Both children full");
@@ -439,25 +481,61 @@ impl<K, V> Bmap<K, V>
                     {
                         // FIXME: Need real delete traversal to keep invariants
                         let mut iter = &mut entry.children[pos];
+                        let rm = Self::remove_key(iter, key);
+                        assert!(rm.is_none());
                         while !iter.is_leaf() {
                             iter = {iter}.children.last_mut().unwrap();
                         }
                         pred_key = iter.keys.pop().unwrap();
                         pred_value = iter.values.pop().unwrap();
                     }
-                    mem::replace(&mut entry.keys[pos], pred_key);
+                    let key = mem::replace(&mut entry.keys[pos], pred_key);
                     let value = mem::replace(&mut entry.values[pos], pred_value);
-                    return Some(value);
+                    return Some((key, value));
                 }
 
             } else if entry.is_leaf() {
+                println!("Gave up in leaf with {} keys", entry.keys.len());
+                for key in &entry.keys {
+                    print!("{:?}, ", unsafe { raw_byte_repr(key) });
+                }
+                println!("");
                 return None
-            } 
-            let next = &mut {entry}.children[pos];
-
-            //assert!(next.order() >= MIN_ORDER);
+            } else if entry.children[pos].order() <= MIN_ORDER {
+                // Don't step into a node with minimal order
+                let mut i = pos;
+                //assert!(entry.children[i].order() >= MIN_ORDER);
+                if i > 0 && entry.children[i - 1].order() > MIN_ORDER {
+                    //i -= 1;
+                    Self::rotate_left_to_right(entry, i - 1);
+                } else if i + 1 < entry.children.len() && entry.children[i + 1].order() > MIN_ORDER {
+                    Self::rotate_right_to_left(entry, i);
+                } else {
+                    if i > 0 { i -= 1 }
+                    if Self::merge_siblings(entry, i) {
+                        return Self::remove_key(entry, key);
+                    }
+                    pos = i;
+                }
+            }
+            let next;
+            if entry.is_leaf() {
+                println!("In merged case");
+                // was made a leaf by merging!
+                next = entry;
+            } else {
+                next = &mut {entry}.children[pos];
+                // can't assert this for the root
+                assert!(next.order() >= MIN_ORDER);
+            }
 
             entry = next;
+
+            print!("continuing to ");
+            for key in &entry.keys {
+                print!("{:?}, ", unsafe { raw_byte_repr(key) });
+            }
+            println!("");
         }
     }
 
@@ -467,7 +545,7 @@ impl<K, V> Bmap<K, V>
         if value.is_some() {
             self.length -= 1;
         }
-        value
+        value.map(|(_, v)| v)
     }
 }
 
@@ -667,9 +745,9 @@ fn test_fuzz_remove() {
     println!("Seed: {:?}", seed);
     let mut rng = ChaChaRng::from_seed(&seed);
 
-    const MAX: usize = 1000; // max test size
+    const MAX: usize = 100; // max test size
     const NTEST: usize = 1000;
-    type Key = i8;
+    type Key = u8;
     for _ in 0..NTEST {
         let size = rng.gen_range(0, MAX);
         let mut keys: Vec<_> = rng.gen_iter::<Key>().take(size).collect();
@@ -697,6 +775,7 @@ fn test_fuzz_remove() {
         rng.shuffle(&mut removals);
         println!("Keys: {:?}", keys);
         println!("Removals: {:?}", removals);
+        println!("Tree BEFORE Removals: {:#?}", m);
 
         // containment check
         for &rkey in &removals {
@@ -719,6 +798,7 @@ fn test_fuzz_remove() {
             assert_eq!(removed.is_some(), is_present);
         }
         assert_eq!(m.len(), keys.len() - n_present);
+        println!("Tree After Removals: {:#?}", m);
     }
 }
 
