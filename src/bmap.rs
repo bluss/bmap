@@ -445,6 +445,10 @@ impl<K, V> Bmap<K, V>
                 print!("{:?}, ", unsafe { raw_byte_repr(key) });
             }
             println!("");
+            let parent_ptr = entry as *mut _;
+            for child in &mut entry.children {
+                child.parent = parent_ptr;
+            }
         }
         removed_root
     }
@@ -798,6 +802,7 @@ fn test_fuzz_remove() {
             }
             assert_eq!(removed.is_some(), is_present);
         }
+        assert_eq!(m.iter().count(), m.len());
         assert_eq!(m.len(), keys.len() - n_present);
         println!("Tree After Removals: {:#?}", m);
     }
