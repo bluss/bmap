@@ -17,6 +17,7 @@ use std::ops::{
 use unreachable::debug_assert_unreachable;
 
 const MAX_ORDER: usize = 12;
+const MIN_ORDER: usize = MAX_ORDER / 2;
 
 #[derive(Debug)]
 struct Entry<K, V> {
@@ -41,7 +42,10 @@ impl<K, V> Entry<K, V>
     }
 
     fn max_order() -> usize { MAX_ORDER }
+    fn min_order(&self) -> usize { MIN_ORDER }
     fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
+
+    fn order(&self) -> usize { self.keys.len() + 1 }
 
     fn is_leaf(&self) -> bool { self.children.len() == 0 }
     //fn order(&self) -> usize { self.children.len() }
@@ -198,6 +202,13 @@ impl<K, V> Entry<K, V>
         existing
     }
 
+    fn remove_at(&mut self, pos: usize) -> V {
+        debug_assert!(self.is_leaf());
+        self.keys.remove(pos);
+        let value = self.values.remove(pos);
+        value.unwrap()
+    }
+
     #[inline]
     unsafe fn parent(&self) -> Option<&Self> {
         if self.parent.is_null() {
@@ -269,6 +280,10 @@ impl<K, V> Bmap<K, V>
         self.root.find_value_mut(key)
     }
 
+    pub fn iter(&self) -> Iter<K, V> {
+        new_iter(self)
+    }
+
     /// Insert **key**
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         /* Top-down insertion:
@@ -322,8 +337,87 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    pub fn iter(&self) -> Iter<K, V> {
-        new_iter(self)
+    fn remove_key(mut entry: &mut Entry<K, V>, key: &K) -> Option<V> {
+        loop {
+            let (has_key, mut pos) = entry.find(key);
+            if has_key {
+                if entry.is_leaf() {
+                    let value = entry.remove_at(pos);
+                    return Some(value);
+                }
+                // we need to move the k-v so we can delete them
+                let (lo, ro) = {
+                    let left = &entry.children[pos];
+                    let right = &entry.children[pos + 1];
+                    (left.order(), right.order())
+                };
+                println!("{:?}, {:?}", lo, ro);
+                if lo == MIN_ORDER && lo == ro {
+                    println!("Merge!");
+                    // Remove key from current entry,
+                    // and merge the children
+                    let pkey = entry.keys.remove(pos).unwrap();
+                    let pval = entry.values.remove(pos).unwrap();
+                    let right_child = *entry.children.remove(pos + 1).unwrap();
+                    for child in &mut entry.children[pos + 1..] {
+                        child.position -= 1;
+                    }
+                    {
+                        let left_child = &mut entry.children[pos];
+                        let (keys, values, children) = match right_child {
+                            Entry { keys, values, children, .. } =>
+                                (keys, values, children)
+                        };
+                        let len = left_child.order();
+                        left_child.keys.push(pkey);
+                        left_child.keys.extend(keys);
+                        left_child.values.push(pval);
+                        left_child.values.extend(values);
+                        let parent_ptr: *mut Entry<_, _> = &mut **left_child;
+                        left_child.children.extend(
+                            children.into_iter()
+                                .map(|mut child| {
+                                    child.position += len;
+                                    child.parent = parent_ptr;
+                                    child
+                                }));
+                    }
+
+                } else if ro > MIN_ORDER && lo != MAX_ORDER {
+                    /* rotate key and child from right to left
+                     *      [B]                [C]
+                     *     /   \     to       /   \
+                     *   [A]   [C D]      [A B]   [D]   **/
+                    /* i: key index in parent */
+                    let rkey = entry.children[pos + 1].keys.remove(0).unwrap();
+                    let rval = entry.children[pos + 1].values.remove(0).unwrap();
+                    // replace parent key
+                    let pkey = mem::replace(&mut entry.keys[pos], rkey);
+                    let pval = mem::replace(&mut entry.values[pos], rval);
+                    entry.children[pos].keys.push(pkey);
+                    entry.children[pos].values.push(pval);
+                    println!("Rotate right to left");
+                } else if ro != MAX_ORDER {
+                    println!("Rotate left to right");
+                    pos += 1;
+                } else {
+                    println!("Both children full");
+                }
+
+            } else if entry.is_leaf() {
+                return None
+            } 
+            entry = &mut {entry}.children[pos];
+        }
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+
+        let value = Self::remove_key(&mut self.root, key);
+        if value.is_some() {
+            self.length -= 1;
+        }
+        value
     }
 }
 
@@ -575,5 +669,51 @@ fn test_generic() {
     }
     assert!(bp.contains(&"rusts"));
     assert!(bp.contains(&"fungi"));
+}
+
+#[test]
+fn test_remove() {
+    let mut bp = bmap!{
+        1 => 1,
+        2 => 2,
+        3 => 3,
+    };
+    println!("{:#?}", bp);
+    assert_eq!(bp.remove(&1), Some(1));
+    assert_eq!(bp.remove(&0), None);
+    assert_eq!(bp.len(), 2);
+    assert_eq!(bp.remove(&2), Some(2));
+    assert_eq!(bp.remove(&3), Some(3));
+    assert_eq!(bp.len(), 0);
+    println!("{:#?}", bp);
+
+
+    // test remove from a non-leaf
+
+    // Rotate case
+    let mut bp = bmap!();
+    for x in 0..MAX_ORDER {
+        bp.insert(x, x);
+    }
+    println!("{:#?}", bp);
+
+    let root_key = bp.root.keys[0];
+    assert!(!bp.root.is_leaf());
+    let removed = bp.remove(&root_key);
+    println!("{:#?}", bp);
+    assert_eq!(removed, Some(root_key));
+
+    // Merge case
+    let mut bp = bmap!();
+    for x in 0..2 * MAX_ORDER {
+        bp.insert(x, x);
+    }
+    println!("{:#?}", bp);
+
+    let root_key = bp.root.keys[0];
+    assert!(!bp.root.is_leaf());
+    let removed = bp.remove(&root_key);
+    println!("{:#?}", bp);
+    assert_eq!(removed, Some(root_key));
 }
 
