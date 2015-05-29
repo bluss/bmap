@@ -293,16 +293,17 @@ impl<K, V> Entry<K, V>
 
     fn rotate_right_to_left(&mut self, pos: usize) {
         /* rotate key and child from right to left
-         *      [B]                [C]
+         *       pos                pos
+         *       v                  v
+         *    [..B..]            [..C..]
          *     /   \     to       /   \
          *   [A]   [C D]      [A B]   [D]   **/
-        /* i: key index in parent */
-        let (rkey, rval, child) = self.children[pos + 1].remove_first();
+        let (mut key, mut val, child) = self.children[pos + 1].remove_first();
 
         // replace parent key
-        let pkey = mem::replace(&mut self.keys[pos], rkey);
-        let pval = mem::replace(&mut self.values[pos], rval);
-        self.children[pos].insert_last(pkey, pval, child);
+        mem::swap(&mut self.keys[pos], &mut key);
+        mem::swap(&mut self.values[pos], &mut val);
+        self.children[pos].insert_last(key, val, child);
     }
 
     fn rotate_left_to_right(&mut self, pos: usize) {
@@ -312,12 +313,12 @@ impl<K, V> Entry<K, V>
          *   [...C..]          [...B..]
          *      / \     to        / \
          * [A B]   [D]         [A]   [C D]       **/
-        let (lkey, lval, child) = self.children[pos].remove_last();
+        let (mut key, mut val, child) = self.children[pos].remove_last();
 
         // replace parent key
-        let pkey = mem::replace(&mut self.keys[pos], lkey);
-        let pval = mem::replace(&mut self.values[pos], lval);
-        self.children[pos + 1].insert_first(pkey, pval, child);
+        mem::swap(&mut self.keys[pos], &mut key);
+        mem::swap(&mut self.values[pos], &mut val);
+        self.children[pos + 1].insert_first(key, val, child);
     }
 
     /// Return **true** if **self** was emptied
