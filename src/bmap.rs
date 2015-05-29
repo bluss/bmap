@@ -438,8 +438,8 @@ impl<K, V> Bmap<K, V>
             println!("Merge removed parent");
             // this is the new root
             let mut left_child = entry.children.pop().unwrap();
-            left_child.parent = null_mut();
-            left_child.position = 0;
+            left_child.parent = entry.parent;
+            left_child.position = entry.position;
             mem::replace(entry, *left_child);
             for key in &entry.keys {
                 print!("{:?}, ", unsafe { raw_byte_repr(key) });
@@ -501,10 +501,9 @@ impl<K, V> Bmap<K, V>
                 }
                 println!("");
                 return None
-            } else if entry.children[pos].order() <= MIN_ORDER {
+            } else if entry.children[pos].order() == MIN_ORDER {
                 // Don't step into a node with minimal order
                 let mut i = pos;
-                //assert!(entry.children[i].order() >= MIN_ORDER);
                 if i > 0 && entry.children[i - 1].order() > MIN_ORDER {
                     //i -= 1;
                     Self::rotate_left_to_right(entry, i - 1);
@@ -517,6 +516,8 @@ impl<K, V> Bmap<K, V>
                     }
                     pos = i;
                 }
+            } else {
+                debug_assert!(entry.children[pos].order() >= MIN_ORDER);
             }
             let next;
             if entry.is_leaf() {
