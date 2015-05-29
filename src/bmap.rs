@@ -395,6 +395,18 @@ fn test_insert_mutate() {
     assert_eq!(m["a"], 3);
 }
 
+#[test]
+fn test_lookup_borrow() {
+    let m = bmap!{
+        vec![1, 2] => 0,
+        vec![1, 3] => 1,
+        vec![2, 2] => 2,
+        vec![2, 3] => 3,
+    };
+    assert_eq!(m[&[1, 2][..]], 0);
+    assert_eq!(m[&[2, 2][..]], 2);
+}
+
 
 #[test]
 fn test_generic() {
