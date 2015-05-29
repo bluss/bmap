@@ -220,17 +220,17 @@ fn bench_iter_bmap(b: &mut Bencher, size: i32) {
 }
 
 #[bench]
-pub fn iter_20(b: &mut Bencher) {
+pub fn iter_20_btree(b: &mut Bencher) {
     bench_iter(b, 20);
 }
 
 #[bench]
-pub fn iter_1000(b: &mut Bencher) {
+pub fn iter_1000_btree(b: &mut Bencher) {
     bench_iter(b, 1000);
 }
 
 #[bench]
-pub fn iter_100000(b: &mut Bencher) {
+pub fn iter_100_000_btree(b: &mut Bencher) {
     bench_iter(b, 100000);
 }
 
@@ -245,6 +245,6 @@ pub fn iter_1000_bmap(b: &mut Bencher) {
 }
 
 #[bench]
-pub fn iter_100000_bmap(b: &mut Bencher) {
+pub fn iter_100_000_bmap(b: &mut Bencher) {
     bench_iter_bmap(b, 100000);
 }
