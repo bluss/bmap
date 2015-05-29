@@ -286,8 +286,7 @@ impl<K, V> Bmap<K, V>
                 }
 
                 match insert_key(&mut entry.children[best_pos], kv) {
-                    Split(kv_, median_k, median_v, mut right_child) => {
-                        //right_child.parent = &mut **entry;
+                    Split(kv_, median_k, median_v, right_child) => {
                         entry.insert(median_k, median_v, Some(right_child));
                         kv = kv_;
                     }
@@ -300,11 +299,11 @@ impl<K, V> Bmap<K, V>
         loop {
             let root = &mut self.root;
             match insert_key(root, kv) {
-                Split(kv_, median_k, median_v, mut right_child) => {
+                Split(kv_, median_k, median_v, right_child) => {
                     // Root was split, replace it with a new empty node,
                     // left side: old root
                     // right side: right_child
-                    let mut left_child = mem::replace(root, Box::new(Entry::new()));
+                    let left_child = mem::replace(root, Box::new(Entry::new()));
                     root.insert_in_root(median_k, median_v,
                                         left_child, right_child);
                     kv = kv_;
