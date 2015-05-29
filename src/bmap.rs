@@ -22,6 +22,7 @@ struct Entry<K, V> {
     values: ArrayVec<[V; MAX_ORDER - 1]>,
     children: ArrayVec<[Box<Entry<K, V>>; MAX_ORDER]>,
     parent: *mut Entry<K, V>,
+    position: usize,
 }
 
 impl<K, V> Entry<K, V>
@@ -33,6 +34,7 @@ impl<K, V> Entry<K, V>
             values: ArrayVec::new(),
             children: ArrayVec::new(),
             parent: null_mut(),
+            position: 0,
         }
     }
 
@@ -60,10 +62,14 @@ impl<K, V> Entry<K, V>
         let median_key = self.keys.pop().unwrap();
         let median_value = self.values.pop().unwrap();
         if !self.is_leaf() {
-            right.children.extend(self.children.drain(1 + Self::median_key_index()..));
             let right_parent: *mut _ = &mut *right;
-            for child in &mut right.children {
+            for (index, mut child) in self.children
+                                        .drain(1 + Self::median_key_index()..)
+                                        .enumerate()
+            {
                 child.parent = right_parent;
+                child.position = index;
+                right.children.push(child);
             }
         }
         (median_key, median_value, right)
@@ -151,20 +157,29 @@ impl<K, V> Entry<K, V>
         debug_assert!(!self.full());
         self.keys.insert(pos, key);
         self.values.insert(pos, value);
-        if let Some(child_) = child {
+        if let Some(mut child_) = child {
+            child_.parent = self;
+            child_.position = pos + 1;
             self.children.insert(pos + 1, child_);
+            for child in &mut self.children[pos + 2..] {
+                child.position += 1;
+            }
         }
     }
 
     fn insert_in_root(&mut self, key: K, value: V,
-                      left: Box<Entry<K, V>>, right: Box<Entry<K, V>>)
+                      mut left: Box<Entry<K, V>>, mut right: Box<Entry<K, V>>)
     {
         debug_assert!(self.keys.len() == 0);
         debug_assert!(self.values.len() == 0);
         debug_assert!(self.children.len() == 0);
         self.keys.push(key);
         self.values.push(value);
+        left.position = 0;
+        left.parent = self;
         self.children.push(left);
+        right.position = 1;
+        right.parent = self;
         self.children.push(right);
     }
 
@@ -175,23 +190,24 @@ impl<K, V> Entry<K, V>
         existing
     }
 
+    #[inline]
+    unsafe fn parent(&self) -> Option<&Self> {
+        if self.parent.is_null() {
+            None
+        } else {
+            Some(&*self.parent)
+        }
+    }
+
     /// in order visit of the btree
-    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &K))
+    fn _visit_inorder(&self, level: usize, f: &mut FnMut(usize, &Entry<K, V>))
         where K: Debug, V: Debug,
     {
-        let mut keys = self.keys.iter();
-        let children = self.children.iter();
-        if self.is_leaf() {
-            for key in keys {
-                f(level, key);
-            }
-        } else {
+        f(level, self);
+        if !self.is_leaf() {
+            let children = self.children.iter();
             for child in children {
                 child._visit_inorder(level + 1, f);
-                match keys.next() {
-                    Some(key) => f(level, key),
-                    None => {}
-                }
             }
         }
     }
@@ -271,7 +287,7 @@ impl<K, V> Bmap<K, V>
 
                 match insert_key(&mut entry.children[best_pos], kv) {
                     Split(kv_, median_k, median_v, mut right_child) => {
-                        right_child.parent = &mut **entry;
+                        //right_child.parent = &mut **entry;
                         entry.insert(median_k, median_v, Some(right_child));
                         kv = kv_;
                     }
@@ -289,8 +305,6 @@ impl<K, V> Bmap<K, V>
                     // left side: old root
                     // right side: right_child
                     let mut left_child = mem::replace(root, Box::new(Entry::new()));
-                    left_child.parent = &mut **root;
-                    right_child.parent = root.parent;
                     root.insert_in_root(median_k, median_v,
                                         left_child, right_child);
                     kv = kv_;
@@ -337,50 +351,55 @@ fn new_iter<K: Ord, V>(map: &Bmap<K, V>) -> Iter<K, V> {
     }
 }
 
-impl<'a, K: Ord, V> Iter<'a, K, V> {
-    unsafe fn parent_of(entry: &Entry<K, V>) -> Option<&Entry<K, V>> {
-        if entry.parent.is_null() {
-            None
-        } else {
-            Some(&*entry.parent)
+impl<'a, K: Ord, V> Iter<'a, K, V> where K: Debug {
+    fn slow_part(&mut self) -> Option<<Self as Iterator>::Item> {
+        let mut entry = self.entry;
+        self.index = 0;
+        loop {
+            let child = entry;
+            entry = match unsafe { entry.parent() } {
+                None => break,
+                Some(parent) => parent,
+            };
+            let i = child.position;
+            /*
+            println!("{:?} pos={}, child={:?}, parent={:?}", child as *const Entry<K, V>,
+                     i, child.keys, entry.keys);
+            println!("{:?}", child as *const _ == &*entry.children[i] as *const _);
+            */
+            debug_assert!(i <= entry.keys.len());
+            debug_assert!(child as *const _ == &*entry.children[i] as *const _);
+            if i == entry.keys.len() {
+                continue;
+            }
+            let next_key = &entry.keys[i];
+            let next_value = &entry.values[i];
+            // dig down to successor
+            entry = &entry.children[i + 1];
+            while !entry.is_leaf() {
+                entry = &entry.children[0];
+            }
+            self.entry = entry;
+            return Some((next_key, next_value));
         }
+        None
     }
 }
 
-impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
-    type Item = &'a K;
+impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> where K: Debug {
+    type Item = (&'a K, &'a V);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let mut entry = self.entry;
+        let entry = self.entry;
         debug_assert!(entry.is_leaf());
         let index = self.index;
         if index < entry.keys.len() {
             self.index += 1;
-            return Some(&entry.keys[index]);
+            Some((&entry.keys[index], &entry.values[index]))
         } else {
-            let last_key = entry.keys.last().unwrap();
-            self.index = 0;
-            loop {
-                entry = match unsafe { Iter::parent_of(entry) } {
-                    None => break,
-                    Some(parent) => parent,
-                };
-                let (eq, lower_bound) = entry.find(last_key);
-                debug_assert!(!eq);
-                if lower_bound == entry.keys.len() {
-                    continue; // continue popping upwards
-                }
-                let next_key = &entry.keys[lower_bound];
-                // dig down to successor
-                entry = &entry.children[lower_bound + 1];
-                while !entry.is_leaf() {
-                    entry = &entry.children[0];
-                }
-                self.entry = entry;
-                return Some(next_key);
-            }
+            self.slow_part()
         }
-        None
     }
 }
 
@@ -449,10 +468,27 @@ fn test_fuzz() {
     for &key in &keys {
         assert!(m.contains(&key));
     }
+    // check parents
+    /*
+    let mut root = &*m.root as *const _;
+    let mut parent = &*m.root as *const _;
+    m.root._visit_inorder(0, &mut |indent, entry| {
+        if entry.parent.is_null() {
+            assert_eq!(entry as *const Entry<usize, ()>, root);
+        } else {
+            println!("Entry: {:?}, {:?}", entry, entry as *const Entry<usize, ()>);
+            unsafe {
+                println!("Parent: {:?}", *entry.parent);
+            }
+            assert_eq!(entry.parent as *const Entry<usize, ()>, parent);
+        }
+        parent = entry;
+    });
+    */
 
     keys.sort();
     assert_eq!(m.iter().count(), keys.len());
-    for (key, map_key) in keys.iter().zip(m.iter()) {
+    for (key, (map_key, _)) in keys.iter().zip(m.iter()) {
         assert_eq!(key, map_key);
     }
 }
