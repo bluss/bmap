@@ -802,6 +802,32 @@ fn test_fuzz_remove() {
             }
             assert_eq!(removed.is_some(), is_present);
         }
+
+        // check parents
+        struct Fix<'a, T, R>(&'a Fn(Fix<T, R>, T) -> R);
+
+        impl<'a, T, R> Fix<'a, T, R> {
+            fn call(&self, arg: T) -> R {
+                let f = *self;
+                f.0(f, arg)
+            }
+        }
+
+        impl<'a, T, R> Clone for Fix<'a, T, R> {
+            fn clone(&self) -> Self { *self }
+        }
+
+        impl<'a, T, R> Copy for Fix<'a, T, R> { }
+
+        let check_parents = |f: Fix<_, _>, entry| {
+            let entry: &Entry<_, _> = entry;
+            entry.children.iter().all(|c|
+                c.parent as *const _ == entry as *const _
+                && f.call(&**c)
+            )
+        };
+        assert!(Fix(&check_parents).call(&*m.root));
+
         println!("After remove: {:#?}", m);
         assert_eq!(m.iter().count(), m.len());
         assert_eq!(m.len(), keys.len() - n_present);
