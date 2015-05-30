@@ -13,8 +13,6 @@ use rand::{Rng, ChaChaRng, SeedableRng};
 #[cfg(test)]
 extern crate itertools as it;
 
-
-
 use std::ops::{
     Index,
     IndexMut,
