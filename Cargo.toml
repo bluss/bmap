@@ -11,6 +11,10 @@ version = "0.3.4"
 rand = "*"
 itertools = "0.3.11"
 
+[dev-dependencies.odds]
+
+path = "../odds"
+
 [profile.bench]
 #lto = false
 #debug = true

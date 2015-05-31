@@ -13,6 +13,9 @@ use rand::{Rng, ChaChaRng, SeedableRng};
 #[cfg(test)]
 extern crate itertools as it;
 
+#[cfg(test)]
+use odds::Fix;
+
 use std::ops::{
     Index,
     IndexMut,
@@ -23,15 +26,6 @@ use unreachable::debug_assert_unreachable;
 // B=6, and MAX_ORDER = 2 * B in Btreemap
 
 const MAX_ORDER: usize = 12;
-
-/// Safe to use with any wholly initialized memory `ptr`
-unsafe fn raw_byte_repr<'a, T>(ptr: &'a T) -> &'a [u8]
-{
-    slice::from_raw_parts(
-        ptr as *const _ as *const u8,
-        mem::size_of::<T>(),
-    )
-}
 
 #[derive(Debug)]
 struct Entry<K, V> {
@@ -801,22 +795,8 @@ fn test_fuzz_remove() {
             assert_eq!(removed.is_some(), is_present);
         }
 
-        // check parents
-        struct Fix<'a, T, R>(&'a Fn(Fix<T, R>, T) -> R);
 
-        impl<'a, T, R> Fix<'a, T, R> {
-            fn call(&self, arg: T) -> R {
-                let f = *self;
-                f.0(f, arg)
-            }
-        }
-
-        impl<'a, T, R> Clone for Fix<'a, T, R> {
-            fn clone(&self) -> Self { *self }
-        }
-
-        impl<'a, T, R> Copy for Fix<'a, T, R> { }
-
+        // check all parent links
         let check_parents = |f: Fix<_, _>, entry| {
             let entry: &Entry<_, _> = entry;
             entry.children.iter().all(|c|
