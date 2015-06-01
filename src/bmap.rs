@@ -484,6 +484,28 @@ impl<K, V> Bmap<K, V>
         where K: Borrow<Q>,
               Q: Ord,
     {
+        /* Deletion
+         *
+         * - Only delete from a leaf
+         *
+         * - Three fixup strategies:
+         *
+         *   A. rotating in the max element of the lower sibling
+         *   B. rotating in the least element of the higher sibling
+         *   C. merging with sibling and a parent element
+         *
+         *   These are used either if
+         *
+         *   a. Key to delete is not in a leaf
+         *   b. Node we are about to enter is min order
+         *
+         * - A last case occurs: Key to delete is not in a leaf,
+         *   and both children are max order.
+         *
+         *   Swap key with its predecessor, and delete its position instead.
+         *   Predecessor is always in a leaf, always last in the node!
+         *
+         */
         loop {
             let (has_key, mut pos) = entry.find(key);
             if has_key {
@@ -497,8 +519,8 @@ impl<K, V> Bmap<K, V>
                     (left.order(), right.order())
                 };
                 if lo == entry.this_min_order() && lo == ro {
-                    // Remove key from current entry,
-                    // and merge the children
+                    // Key to delete is parent to two min-size children.
+                    // Push down key to merged children.
                     if entry.merge_siblings(pos) {
                         continue;
                     }
@@ -530,11 +552,6 @@ impl<K, V> Bmap<K, V>
             } else if entry.is_leaf() {
                 return None
             } else if entry.children[pos].order() == entry.this_min_order() {
-                /* if we step into a node of min order, then we fix it up by one of:
-                 * A. rotating in the max element of the lower sibling
-                 * B. rotating in the least element of the higher sibling
-                 * C. merging with sibling and a parent element
-                 */
                 if pos > 0 && entry.children[pos - 1].order() > entry.this_min_order() {
                     entry.rotate_left_to_right(pos - 1);
                 } else if pos + 1 < entry.children.len()
