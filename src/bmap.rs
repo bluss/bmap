@@ -770,9 +770,9 @@ fn test_fuzz_remove() {
         removals.sort();
         removals.dedup();
         rng.shuffle(&mut removals);
-        println!("Keys: {:?}", keys);
-        println!("Removals: {:?}", removals);
-        println!("Tree BEFORE Removals: {:#?}", m);
+        //println!("Keys: {:?}", keys);
+        //println!("Removals: {:?}", removals);
+        //println!("Tree BEFORE Removals: {:#?}", m);
 
         // containment check
         for &rkey in &removals {
@@ -806,10 +806,9 @@ fn test_fuzz_remove() {
         };
         assert!(Fix(&check_parents).call(&*m.root));
 
-        println!("After remove: {:#?}", m);
+        //println!("After remove: {:#?}", m);
         assert_eq!(m.iter().count(), m.len());
         assert_eq!(m.len(), keys.len() - n_present);
-        println!("Tree After Removals: {:#?}", m);
     }
 }
 
