@@ -5,6 +5,7 @@ use std::default::Default;
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::slice;
+use odds;
 
 #[cfg(test)]
 extern crate rand;
@@ -644,13 +645,18 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
             if i == entry.keys.len() {
                 continue;
             }
-            let next_key = &entry.keys[i];
-            let next_value = &entry.values[i];
+            let next_key;
+            let next_value;
+            // Unchecked indexing improves iteration runtime by minuscle 2%.
+            unsafe {
+                next_key = odds::get_unchecked(&*entry.keys, i);
+                next_value = odds::get_unchecked(&*entry.values, i);
 
-            // dig down to successor
-            entry = &entry.children[i + 1];
-            while !entry.is_leaf() {
-                entry = &entry.children[0];
+                // dig down to successor
+                entry = &odds::get_unchecked(&*entry.children, i + 1);
+                while let Some(entry_) = entry.children.get(0) {
+                    entry = entry_;
+                }
             }
             self.keyiter = entry.keys.iter();
             self.valiter = entry.values.iter();
