@@ -13,7 +13,7 @@ itertools = "0.3.11"
 
 [dependencies.odds]
 
-path = "../odds"
+version = "0.1"
 
 [profile.bench]
 #lto = false
