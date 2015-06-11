@@ -221,6 +221,21 @@ fn bench_iter_bmap(b: &mut Bencher, size: i32) {
     });
 }
 
+fn bench_iter_range_bmap(b: &mut Bencher, size: i32) {
+    let mut map = Bmap::<i32, i32>::new();
+    let mut rng = thread_rng();
+
+    for _ in 0..size {
+        map.insert(rng.gen(), rng.gen());
+    }
+
+    b.iter(|| {
+        for entry in map.iter_range(&i32::min_value(), &i32::max_value()) {
+            black_box(entry);
+        }
+    });
+}
+
 #[bench]
 pub fn iter_20_btree(b: &mut Bencher) {
     bench_iter(b, 20);
@@ -244,6 +259,11 @@ pub fn iter_20_bmap(b: &mut Bencher) {
 #[bench]
 pub fn iter_1000_bmap(b: &mut Bencher) {
     bench_iter_bmap(b, 1000);
+}
+
+#[bench]
+pub fn iter_range_1000_bmap(b: &mut Bencher) {
+    bench_iter_range_bmap(b, 1000);
 }
 
 #[bench]
