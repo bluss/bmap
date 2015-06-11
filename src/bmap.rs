@@ -736,6 +736,12 @@ impl<K: Ord, V> Default for Bmap<K, V> {
     fn default() -> Self { Bmap::new() }
 }
 
+impl<'a, K: Ord, V> IntoIterator for &'a Bmap<K, V> {
+    type Item = (&'a K, &'a V);
+    type IntoIter = Iter<'a, K, V>;
+    fn into_iter(self) -> Iter<'a, K, V> { self.iter() }
+}
+
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
