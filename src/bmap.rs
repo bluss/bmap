@@ -823,18 +823,21 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
             if next_key.borrow() > self.end {
                 return None
             }
-            // check if we have reached the end key:
-            let (has_end, j) = entry.find(self.end);
-            if has_end {
-                // setup termination
-                self.last = true;
-                self.keyiter = entry.keys[..j+1].iter();
-                self.valiter = entry.values[..j+1].iter();
-            } else {
-                // `j` may be == keys.len() or shorter. If shorter, we are done.
-                self.last = j != entry.keys.len();
-                self.keyiter = entry.keys[..j].iter();
-                self.valiter = entry.values[..j].iter();
+            unsafe {
+                // check if we have reached the end key:
+                let (has_end, j) = entry.find(self.end);
+                // Unchecked slicing improves iteration runtime by minuscle 1%.
+                if has_end {
+                    // setup termination
+                    self.last = true;
+                    self.keyiter = odds::slice_unchecked(&entry.keys, 0, j + 1).iter();
+                    self.valiter = odds::slice_unchecked(&entry.values, 0, j + 1).iter();
+                } else {
+                    // `j` may be == keys.len() or shorter. If shorter, we are done.
+                    self.last = j != entry.keys.len();
+                    self.keyiter = odds::slice_unchecked(&entry.keys, 0, j).iter();
+                    self.valiter = odds::slice_unchecked(&entry.values, 0, j).iter();
+                }
             }
             self.entry = entry;
             return Some((next_key, next_value));
