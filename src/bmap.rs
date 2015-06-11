@@ -793,6 +793,7 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
         let mut entry = self.entry;
         loop {
             if self.last {
+                // FIXME: We might not need this bool
                 return None
             }
             let child = entry;
@@ -825,7 +826,7 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
             // check if we have reached the end key:
             let (has_end, j) = entry.find(self.end);
             if has_end {
-                // setup termination by setting entry to root
+                // setup termination
                 self.last = true;
                 self.keyiter = entry.keys[..j+1].iter();
                 self.valiter = entry.values[..j+1].iter();
