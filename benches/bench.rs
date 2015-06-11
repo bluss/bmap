@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(test)]
+#![feature(test, collections)]
 extern crate bmap;
 extern crate rand;
 extern crate test;
@@ -160,6 +160,7 @@ macro_rules! map_insert_rand_bench {
 
 use bmap::Bmap;
 use std::collections::BTreeMap;
+use std::collections::Bound;
 
 use rand::{thread_rng, Rng};
 use test::Bencher;
@@ -206,6 +207,21 @@ fn bench_iter(b: &mut Bencher, size: i32) {
     });
 }
 
+fn bench_iter_range_btree(b: &mut Bencher, size: i32) {
+    let mut map = BTreeMap::<i32, i32>::new();
+    let mut rng = thread_rng();
+
+    for _ in 0..size {
+        map.insert(rng.gen(), rng.gen());
+    }
+
+    b.iter(|| {
+        for entry in map.range(Bound::Included(&i32::min_value()), Bound::Included(&i32::max_value())) {
+            black_box(entry);
+        }
+    });
+}
+
 fn bench_iter_bmap(b: &mut Bencher, size: i32) {
     let mut map = Bmap::<i32, i32>::new();
     let mut rng = thread_rng();
@@ -244,6 +260,11 @@ pub fn iter_20_btree(b: &mut Bencher) {
 #[bench]
 pub fn iter_1000_btree(b: &mut Bencher) {
     bench_iter(b, 1000);
+}
+
+#[bench]
+pub fn iter_range_1000_btree(b: &mut Bencher) {
+    bench_iter_range_btree(b, 1000);
 }
 
 #[bench]
