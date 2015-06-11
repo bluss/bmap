@@ -138,6 +138,31 @@ impl<K, V> Entry<K, V> {
         (false, i)
     }
 
+    /// Return (is_equal, best_position)
+    ///
+    /// Begin search from end of key vector
+    fn find_rev<Q: ?Sized>(&self, key: &Q) -> (bool, usize)
+        where K: Ord + Borrow<Q>,
+              Q: Ord,
+    {
+        if Self::max_order() >= 128 {
+            return self.find(key)
+        }
+        // find lower bound:
+        // index where keys[i] < key for all i < index
+        let mut i = self.keys.len();
+        for k in self.keys.iter().rev() {
+            if k.borrow() <= key {
+                if k.borrow() == key {
+                    return (true, i - 1);
+                }
+                break;
+            }
+            i -= 1;
+        }
+        (false, i)
+    }
+
     fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
         where K: Ord + Borrow<Q>,
               Q: Ord,
@@ -847,8 +872,10 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
             }
             unsafe {
                 // check if we have reached the end key:
-                let (has_end, j) = entry.find(self.end);
-                // Unchecked slicing improves iteration runtime by minuscle 1%.
+                // Search from the back of the key array -- decreases iteration runtime by 32 %
+                // Used to search from the front
+                let (has_end, j) = entry.find_rev(self.end);
+                // Unchecked slicing decreases iteration runtime by minuscle 1%.
                 if has_end {
                     // setup termination
                     self.last = true;
