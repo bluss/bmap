@@ -634,6 +634,54 @@ impl<K, V> Bmap<K, V>
             }
         }
     }
+
+    /// Iterate from the key **k** to the key **l** (both inclusive).
+    ///
+    /// Iterator element type is **(&K, &V)**.
+    pub fn iter_range<'a, Q>(&'a self, k: &Q, l: &'a Q) -> Range<'a, K, V, Q>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        // find and focus the greatest lower bound
+        let mut entry = &self.root;
+        loop {
+            let (has, i) = entry.find(k);
+            if entry.is_leaf() {
+                let (has_end, j) = entry.find(l);
+                if has_end {
+                    return Range {
+                        entry: &self.root,
+                        keyiter: entry.keys[i..j + 1].iter(),
+                        valiter: entry.values[i..j + 1].iter(),
+                        end: l,
+                    }
+                } else {
+                    return Range {
+                        entry: entry,
+                        keyiter: entry.keys[i..].iter(),
+                        valiter: entry.values[i..].iter(),
+                        end: l,
+                    }
+                }
+            } else if has {
+                entry = &entry.children[i];
+                // FIXME: descending to leaf here is unnecessary,
+                // just to satisfy always-stop-in-leaf invariant in Iter
+                /* descend to leaf */
+                while !entry.is_leaf() {
+                    entry = &entry.children.last().unwrap();
+                }
+                return Range {
+                    entry: entry,
+                    keyiter: [].iter(),
+                    valiter: [].iter(),
+                    end: l,
+                }
+            } else {
+                entry = &entry.children[i];
+            }
+        }
+    }
 }
 
 impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bmap<K, V>
@@ -724,6 +772,89 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
         }
     }
 }
+
+pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
+    entry: &'a Entry<K, V>,
+    keyiter: slice::Iter<'a, K>,
+    valiter: slice::Iter<'a, V>,
+    end: &'a Q,
+}
+
+impl<'a, K, V, Q> Range<'a, K, V, Q>
+    where K: Borrow<Q> + Ord,
+          Q: Ord,
+{
+    fn next_switch_node(&mut self) -> Option<<Self as Iterator>::Item> {
+        let mut entry = self.entry;
+        loop {
+            let child = entry;
+            let i = child.position;
+            entry = match unsafe { entry.parent() } {
+                None => break,
+                Some(parent) => parent,
+            };
+            debug_assert!(i <= entry.keys.len());
+            debug_assert!(child as *const _ == &*entry.children[i] as *const _);
+            if i == entry.keys.len() {
+                continue;
+            }
+            let next_key;
+            let next_value;
+            // Unchecked indexing improves iteration runtime by minuscle 2%.
+            unsafe {
+                next_key = odds::get_unchecked(&*entry.keys, i);
+                next_value = odds::get_unchecked(&*entry.values, i);
+
+                // dig down to successor
+                entry = &odds::get_unchecked(&*entry.children, i + 1);
+                while let Some(entry_) = entry.children.get(0) {
+                    entry = entry_;
+                }
+            }
+            // check if we have reached the end key:
+            let (has_end, j) = entry.find(self.end);
+            if has_end {
+                // setup termination by setting entry to root
+                while let Some(par) = unsafe { entry.parent() } {
+                    entry = par;
+                }
+                self.entry = entry;
+                self.keyiter = entry.keys[..j+1].iter();
+                self.valiter = entry.values[..j+1].iter();
+            } else {
+                self.keyiter = entry.keys.iter();
+                self.valiter = entry.values.iter();
+                self.entry = entry;
+            }
+            return Some((next_key, next_value));
+        }
+        None
+    }
+}
+
+impl<'a, K, V, Q> Iterator for Range<'a, K, V, Q>
+    where K: Borrow<Q> + Ord,
+          Q: Ord,
+{
+    type Item = (&'a K, &'a V);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        debug_assert!(self.entry.is_leaf());
+        if let Some(key) = self.keyiter.next() {
+            unsafe {
+                match self.valiter.next() {
+                    Some(value) => Some((key, value)),
+                    None => debug_assert_unreachable(), // key, value pairs
+                }
+            }
+        } else {
+            self.next_switch_node()
+        }
+    }
+}
+
+
 
 #[test]
 fn test_new() {
