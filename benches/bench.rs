@@ -246,7 +246,7 @@ fn bench_iter_range_bmap(b: &mut Bencher, size: i32) {
     }
 
     b.iter(|| {
-        for entry in map.iter_range(&i32::min_value(), &i32::max_value()) {
+        for entry in map.range(&i32::min_value(), &i32::max_value()) {
             black_box(entry);
         }
     });

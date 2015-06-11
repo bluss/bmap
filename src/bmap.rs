@@ -638,7 +638,7 @@ impl<K, V> Bmap<K, V>
     /// Iterate from the key **k** to the key **l** (both inclusive).
     ///
     /// Iterator element type is **(&K, &V)**.
-    pub fn iter_range<'a, Q>(&'a self, k: &Q, l: &'a Q) -> Range<'a, K, V, Q>
+    pub fn range<'a, Q>(&'a self, k: &Q, l: &'a Q) -> Range<'a, K, V, Q>
         where K: Borrow<Q>,
               Q: Ord,
     {
@@ -1198,10 +1198,10 @@ fn test_iter_range() {
             for key2 in key1..256 {
                 let key1_8 = key1 as u8;
                 let key2_8 = key2 as u8;
-                assert!(it::equal(t1.iter_range(&key1_8, &key2_8),
+                assert!(it::equal(t1.range(&key1_8, &key2_8),
                           t1.iter().filter(|&(&k, _)| k >= key1_8 && k <= key2_8)),
                         "failed: equal for Range from={}, to={}, \niter1={:?}\ntree={:?}",
-                        key1, key2, t1.iter_range(&key1_8, &key2_8).map(tup_get_0).collect::<Vec<_>>(),
+                        key1, key2, t1.range(&key1_8, &key2_8).map(tup_get_0).collect::<Vec<_>>(),
                         t1);
             }
         }
