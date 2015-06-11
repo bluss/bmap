@@ -149,7 +149,7 @@ impl<K, V> Entry<K, V> {
             false
         } else {
             self.children[lower_bound].contains_key(key)
-        } 
+        }
     }
 
     fn find_value<Q: ?Sized>(&self, key: &Q) -> Option<&V>
@@ -163,7 +163,7 @@ impl<K, V> Entry<K, V> {
             None
         } else {
             self.children[lower_bound].find_value(key)
-        } 
+        }
     }
 
     fn find_value_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
@@ -177,7 +177,7 @@ impl<K, V> Entry<K, V> {
             None
         } else {
             self.children[lower_bound].find_value_mut(key)
-        } 
+        }
     }
 
     fn value_at(&self, index: usize) -> &V {
@@ -1109,7 +1109,7 @@ fn test_remove() {
 
     let mid = max_keys + 1;
     bp.insert(mid, mid);
-    
+
     for (index, x) in (0..mid).rev().enumerate() {
         let index = 2 * index + 1;
         bp.insert(x, x);
