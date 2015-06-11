@@ -69,6 +69,27 @@ macro_rules! map_insert_seq_bench {
     )
 }
 
+macro_rules! map_insert_seq2_bench {
+    ($name: ident, $n: expr, $map: ident) => (
+        #[bench]
+        pub fn $name(b: &mut ::test::Bencher) {
+            use test::black_box;
+
+            let mut map = $map::new();
+            let n: usize = $n;
+
+            // measure
+            b.iter(|| {
+                for i in 0..n {
+                    map.insert(i, i);
+                }
+            });
+            black_box(map);
+        }
+    )
+}
+
+
 macro_rules! map_find_rand_bench {
     ($name: ident, $n: expr, $map: ident) => (
         #[bench]
@@ -181,6 +202,11 @@ map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
 map_insert_rand_bench!{insert_rand_10_000, 10_000, BTreeMap}
 map_insert_rand_bench!{insert_rand_100_bmap,    100,    Bmap}
 map_insert_rand_bench!{insert_rand_10_000_bmap, 10_000, Bmap}
+
+map_insert_seq2_bench!{insert_seq2_100,    100,    BTreeMap}
+map_insert_seq2_bench!{insert_seq2_10_000, 10_000, BTreeMap}
+map_insert_seq2_bench!{insert_seq2_100_bmap,    100,    Bmap}
+map_insert_seq2_bench!{insert_seq2_10_000_bmap, 10_000, Bmap}
 
 map_find_rand_bench!{find_rand_100,    100,    BTreeMap}
 map_find_rand_bench!{find_rand_100_bmap,    100,    Bmap}
