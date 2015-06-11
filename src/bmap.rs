@@ -22,7 +22,7 @@ use std::ops::{
     IndexMut,
 };
 
-use unreachable::debug_assert_unreachable;
+use odds::debug_assert_unreachable;
 
 // B=6, and MAX_ORDER = 2 * B in Btreemap
 
