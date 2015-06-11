@@ -172,10 +172,10 @@ map_insert_remove_rand_bench!{insert_remove_rand_10_000_btree, 10_000, BTreeMap}
 map_insert_remove_rand_bench!{insert_remove_rand_100_bmap,    100,    Bmap}
 map_insert_remove_rand_bench!{insert_remove_rand_10_000_bmap, 10_000, Bmap}
 
-/*
 map_insert_seq_bench!{insert_seq_100,    100,    BTreeMap}
 map_insert_seq_bench!{insert_seq_10_000, 10_000, BTreeMap}
-*/
+map_insert_seq_bench!{insert_seq_100_bmap,    100,    Bmap}
+map_insert_seq_bench!{insert_seq_10_000_bmap, 10_000, Bmap}
 
 map_insert_rand_bench!{insert_rand_100,    100,    BTreeMap}
 map_insert_rand_bench!{insert_rand_10_000, 10_000, BTreeMap}
