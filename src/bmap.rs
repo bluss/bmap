@@ -742,6 +742,25 @@ impl<'a, K: Ord, V> IntoIterator for &'a Bmap<K, V> {
     fn into_iter(self) -> Iter<'a, K, V> { self.iter() }
 }
 
+impl<K: Ord, V> Extend<(K, V)> for Bmap<K, V> {
+    fn extend<T: IntoIterator<Item=(K, V)>>(&mut self, iter: T) {
+        for (k, v) in iter {
+            self.insert(k, v);
+        }
+    }
+}
+
+impl<'a, K, V> Extend<(&'a K, &'a V)> for Bmap<K, V>
+    where K: 'a + Ord + Clone,
+          V: 'a + Clone,
+{
+    fn extend<T: IntoIterator<Item=(&'a K, &'a V)>>(&mut self, iter: T) {
+        for (k, v) in iter {
+            self.insert(k.clone(), v.clone());
+        }
+    }
+}
+
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
