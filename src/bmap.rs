@@ -650,9 +650,18 @@ impl<K, V> Bmap<K, V>
                 let (has_end, j) = entry.find(l);
                 if has_end {
                     return Range {
-                        entry: &self.root,
+                        entry: entry,
                         keyiter: entry.keys[i..j + 1].iter(),
                         valiter: entry.values[i..j + 1].iter(),
+                        last: true,
+                        end: l,
+                    }
+                } else if j < entry.keys.len() {
+                    return Range {
+                        entry: entry,
+                        keyiter: entry.keys[i..j].iter(),
+                        valiter: entry.values[i..j].iter(),
+                        last: false,
                         end: l,
                     }
                 } else {
@@ -660,6 +669,7 @@ impl<K, V> Bmap<K, V>
                         entry: entry,
                         keyiter: entry.keys[i..].iter(),
                         valiter: entry.values[i..].iter(),
+                        last: false,
                         end: l,
                     }
                 }
@@ -675,6 +685,7 @@ impl<K, V> Bmap<K, V>
                     entry: entry,
                     keyiter: [].iter(),
                     valiter: [].iter(),
+                    last: false,
                     end: l,
                 }
             } else {
@@ -777,6 +788,7 @@ pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
     valiter: slice::Iter<'a, V>,
+    last: bool,
     end: &'a Q,
 }
 
@@ -787,6 +799,9 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
     fn next_switch_node(&mut self) -> Option<<Self as Iterator>::Item> {
         let mut entry = self.entry;
         loop {
+            if self.last {
+                return None
+            }
             let child = entry;
             let i = child.position;
             entry = match unsafe { entry.parent() } {
@@ -811,21 +826,25 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                     entry = entry_;
                 }
             }
+            if next_key.borrow() > self.end {
+                return None
+            }
             // check if we have reached the end key:
             let (has_end, j) = entry.find(self.end);
             if has_end {
                 // setup termination by setting entry to root
-                while let Some(par) = unsafe { entry.parent() } {
-                    entry = par;
-                }
-                self.entry = entry;
+                self.last = true;
                 self.keyiter = entry.keys[..j+1].iter();
                 self.valiter = entry.values[..j+1].iter();
+            } else if j < entry.keys.len() {
+                self.last = true;
+                self.keyiter = entry.keys[..j].iter();
+                self.valiter = entry.values[..j].iter();
             } else {
                 self.keyiter = entry.keys.iter();
                 self.valiter = entry.values.iter();
-                self.entry = entry;
             }
+            self.entry = entry;
             return Some((next_key, next_value));
         }
         None
@@ -1142,10 +1161,32 @@ fn test_iter_from() {
     let sz = 128;
     let n = 10;
     for _ in 0.. n {
-        let t1 = create_random_tree::<u8, u8>(sz);
+        let t1 = create_random_tree::<u8, ()>(sz);
         for key in 0..256 {
             let key8 = key as u8;
             it::assert_equal(t1.iter_from(&key8), t1.iter().filter(|&(&k, _)| k >= key8));
+        }
+    }
+}
+
+
+#[test]
+fn test_iter_range() {
+    fn tup_get_0<T, U>(t: (T, U)) -> T { t.0 }
+    let sz = 128;
+    let n = 10;
+    for _ in 0.. n {
+        let t1 = create_random_tree::<u8, ()>(sz);
+        for key1 in 0..256 {
+            for key2 in key1..256 {
+                let key1_8 = key1 as u8;
+                let key2_8 = key2 as u8;
+                assert!(it::equal(t1.iter_range(&key1_8, &key2_8),
+                          t1.iter().filter(|&(&k, _)| k >= key1_8 && k <= key2_8)),
+                        "failed: equal for Range from={}, to={}, \niter1={:?}\ntree={:?}",
+                        key1, key2, t1.iter_range(&key1_8, &key2_8).map(tup_get_0).collect::<Vec<_>>(),
+                        t1);
+            }
         }
     }
 }
