@@ -711,6 +711,7 @@ impl<K: Ord, V> Default for Bmap<K, V> {
     fn default() -> Self { Bmap::new() }
 }
 
+#[derive(Clone)]
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
@@ -777,6 +778,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
     }
 }
 
+#[derive(Clone)]
 pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
