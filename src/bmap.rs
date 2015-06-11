@@ -711,11 +711,20 @@ impl<K: Ord, V> Default for Bmap<K, V> {
     fn default() -> Self { Bmap::new() }
 }
 
-#[derive(Clone)]
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
     valiter: slice::Iter<'a, V>,
+}
+
+impl<'a, K, V> Clone for Iter<'a, K, V> {
+    fn clone(&self) -> Self {
+        Iter {
+            entry: self.entry,
+            keyiter: self.keyiter.clone(),
+            valiter: self.valiter.clone(),
+        }
+    }
 }
 
 // The iterator has some nice invariants.
@@ -778,13 +787,24 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
     }
 }
 
-#[derive(Clone)]
 pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
     valiter: slice::Iter<'a, V>,
     last: bool,
     end: &'a Q,
+}
+
+impl<'a, K, V, Q> Clone for Range<'a, K, V, Q> {
+    fn clone(&self) -> Self {
+        Range {
+            entry: self.entry,
+            keyiter: self.keyiter.clone(),
+            valiter: self.valiter.clone(),
+            last: self.last,
+            end: self.end,
+        }
+    }
 }
 
 impl<'a, K, V, Q> Range<'a, K, V, Q>
