@@ -583,6 +583,9 @@ impl<K, V> Bmap<K, V>
         value.map(|(_, v)| v)
     }
 
+    /// Iterate the Bmap.
+    ///
+    /// Iterator element type is **(&K, &V)**.
     pub fn iter(&self) -> Iter<K, V> {
         // find and focus the lower bound
         let mut entry = &self.root;
@@ -593,6 +596,42 @@ impl<K, V> Bmap<K, V>
             entry: entry,
             keyiter: entry.keys.iter(),
             valiter: entry.values.iter(),
+        }
+    }
+
+    /// Iterate from the key **k** (inclusive).
+    ///
+    /// Iterator element type is **(&K, &V)**.
+    pub fn iter_from<Q>(&self, k: &Q) -> Iter<K, V>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        // find and focus the greatest lower bound
+        let mut entry = &self.root;
+        loop {
+            let (has, i) = entry.find(k);
+            if entry.is_leaf() {
+                return Iter {
+                    entry: entry,
+                    keyiter: entry.keys[i..].iter(),
+                    valiter: entry.values[i..].iter(),
+                }
+            } else if has {
+                entry = &entry.children[i];
+                // FIXME: descending to leaf here is unnecessary,
+                // just to satisfy always-stop-in-leaf invariant in Iter
+                /* descend to leaf */
+                while !entry.is_leaf() {
+                    entry = &entry.children.last().unwrap();
+                }
+                return Iter {
+                    entry: entry,
+                    keyiter: [].iter(),
+                    valiter: [].iter(),
+                }
+            } else {
+                entry = &entry.children[i];
+            }
         }
     }
 }
@@ -965,5 +1004,18 @@ fn test_clone() {
     let t2 = t1.clone();
 
     it::assert_equal(t1.iter(), t2.iter());
+}
+
+#[test]
+fn test_iter_from() {
+    let sz = 128;
+    let n = 10;
+    for _ in 0.. n {
+        let t1 = create_random_tree::<u8, u8>(sz);
+        for key in 0..256 {
+            let key8 = key as u8;
+            it::assert_equal(t1.iter_from(&key8), t1.iter().filter(|&(&k, _)| k >= key8));
+        }
+    }
 }
 
