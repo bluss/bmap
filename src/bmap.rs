@@ -656,19 +656,12 @@ impl<K, V> Bmap<K, V>
                         last: true,
                         end: l,
                     }
-                } else if j < entry.keys.len() {
+                } else {
+                    // `j` may be == keys.len() here or shorter.
                     return Range {
                         entry: entry,
                         keyiter: entry.keys[i..j].iter(),
                         valiter: entry.values[i..j].iter(),
-                        last: false,
-                        end: l,
-                    }
-                } else {
-                    return Range {
-                        entry: entry,
-                        keyiter: entry.keys[i..].iter(),
-                        valiter: entry.values[i..].iter(),
                         last: false,
                         end: l,
                     }
@@ -836,13 +829,11 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                 self.last = true;
                 self.keyiter = entry.keys[..j+1].iter();
                 self.valiter = entry.values[..j+1].iter();
-            } else if j < entry.keys.len() {
-                self.last = true;
+            } else {
+                // `j` may be == keys.len() or shorter. If shorter, we are done.
+                self.last = j != entry.keys.len();
                 self.keyiter = entry.keys[..j].iter();
                 self.valiter = entry.values[..j].iter();
-            } else {
-                self.keyiter = entry.keys.iter();
-                self.valiter = entry.values.iter();
             }
             self.entry = entry;
             return Some((next_key, next_value));
