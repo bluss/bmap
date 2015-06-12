@@ -1102,7 +1102,7 @@ fn test_fuzz_remove() {
         let check_parents = |f: Fix<_, _>, entry| {
             let entry: &Entry<_, _> = entry;
             entry.children.iter().all(|c|
-                c.parent as *const _ == entry as *const _
+                odds::ptr_eq(c.parent, entry)
                 && f.call(&**c)
             )
         };
