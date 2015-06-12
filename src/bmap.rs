@@ -1,3 +1,9 @@
+
+//! **Bmap\<K, V\>** is an associative array implemented with a B-Tree.
+//!
+//!
+//!
+
 use arrayvec::ArrayVec;
 use std::mem;
 use std::ptr::null_mut;
@@ -406,6 +412,9 @@ impl<K, V> Entry<K, V> {
 
 }
 
+/// **Bmap\<K, V\>** is an associative array implemented with a B-Tree.
+///
+/// Key-value pairs are ordered by the key in ascending order.
 #[derive(Clone)] // OK because Entry's clone is sane
 #[derive(Debug)]
 pub struct Bmap<K, V> {
@@ -423,6 +432,7 @@ enum Insert<K, V> {
 impl<K, V> Bmap<K, V>
     where K: Ord
 {
+    /// Create a new **Bmap**.
     pub fn new() -> Self {
         Bmap {
             length: 0,
@@ -453,7 +463,9 @@ impl<K, V> Bmap<K, V>
         self.root.find_value_mut(key)
     }
 
-    /// Insert **key**
+    /// Insert **key**, **value**.
+    ///
+    /// Return previous **value** for the key, or **None**.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         /* Top-down insertion:
          * Search downwards to find a leaf where we can insert the key.
@@ -601,14 +613,21 @@ impl<K, V> Bmap<K, V>
         where K: Borrow<Q>,
               Q: Ord,
     {
+        self.remove_key_value(key).map(|(_, v)| v)
+    }
+
+    pub fn remove_key_value<Q: ?Sized>(&mut self, key: &Q) -> Option<(K, V)>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
         let value = Self::remove_key(&mut self.root, key);
         if value.is_some() {
             self.length -= 1;
         }
-        value.map(|(_, v)| v)
+        value
     }
 
-    /// Iterate the Bmap.
+    /// Iterate the Bmap in order.
     ///
     /// Iterator element type is **(&K, &V)**.
     pub fn iter(&self) -> Iter<K, V> {
@@ -624,7 +643,7 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    /// Iterate from the key **k** (inclusive).
+    /// Iterate in order from the key **k** (inclusive).
     ///
     /// Iterator element type is **(&K, &V)**.
     pub fn iter_from<Q>(&self, k: &Q) -> Iter<K, V>
@@ -660,7 +679,7 @@ impl<K, V> Bmap<K, V>
         }
     }
 
-    /// Iterate from the key **k** to the key **l** (both inclusive).
+    /// Iterate in order from the key **k** to the key **l** (both inclusive).
     ///
     /// Iterator element type is **(&K, &V)**.
     pub fn range<'a, Q>(&'a self, k: &Q, l: &'a Q) -> Range<'a, K, V, Q>
@@ -761,6 +780,7 @@ impl<'a, K, V> Extend<(&'a K, &'a V)> for Bmap<K, V>
     }
 }
 
+/// Default iterator for **Bmap**.
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
@@ -837,6 +857,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
     }
 }
 
+/// Key range iterator.
 pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
     keyiter: slice::Iter<'a, K>,
