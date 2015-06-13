@@ -3,6 +3,11 @@ name = "bmap"
 version = "0.1.0"
 authors = ["bluss"]
 
+description = "A high performance version of a B-Tree map. API is still changing, depend on explicit 0.x versions to avoid breakage."
+documentation = "http://bluss.github.io/bmap"
+repository = "https://github.com/bluss/bmap"
+keywords = ["data-structure", "btreemap", "b-tree", "range"]
+
 [dependencies.arrayvec]
 #path = "../arrayvec"
 version = "0.3.4"
