@@ -16,7 +16,7 @@ $(DOCCRATES): %: target/VERS/%
 subst: $(DOCCRATES)
 
 mkdocs: Cargo.toml
-	cargo doc
+	cargo doc --no-deps
 	rm -rf ./doc
 	cp -r ./target/doc ./doc
 	-cat ./custom.css >> doc/main.css
