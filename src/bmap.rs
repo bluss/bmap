@@ -211,6 +211,20 @@ impl<K, V> Entry<K, V> {
         }
     }
 
+    fn find_key_value_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<(&K, &mut V)>
+        where K: Ord + Borrow<Q>,
+              Q: Ord,
+    {
+        let (has, lower_bound) = self.find(key);
+        if has {
+            Some((&self.keys[lower_bound], &mut self.values[lower_bound]))
+        } else if self.is_leaf() {
+            None
+        } else {
+            self.children[lower_bound].find_key_value_mut(key)
+        }
+    }
+
     fn value_at(&self, index: usize) -> &V {
         &self.values[index]
     }
@@ -461,6 +475,27 @@ impl<K, V> Bmap<K, V>
               Q: Ord,
     {
         self.root.find_value_mut(key)
+    }
+
+    /// Experimental get twice method
+    pub fn get_twice_mut<Q: ?Sized>(&mut self, k: &Q, m: &Q)
+        -> Option<(&K, &mut V, &K, &mut V)>
+        where K: Borrow<Q>,
+              Q: Ord,
+    {
+        if k == m {
+            return None
+        }
+
+        // Allow two mutable indexes here -- they are nonoverlapping
+        unsafe {
+            let self_mut = self as *mut Self;
+            match ((*self_mut).root.find_key_value_mut(k),
+                   (*self_mut).root.find_key_value_mut(m)) {
+                (Some((a, b)), Some((c, d))) => Some((a, b, c, d)),
+                _ => None
+            }
+        }
     }
 
     /// Insert **key**, **value**.
@@ -730,6 +765,7 @@ impl<K, V> Bmap<K, V>
             }
         }
     }
+
 }
 
 impl<'a, K, V, Q: ?Sized> Index<&'a Q> for Bmap<K, V>
