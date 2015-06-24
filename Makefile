@@ -1,20 +1,24 @@
-CRATES = bmap
+DOCCRATES = bmap
+
+VERSIONS = $(patsubst %,target/VERS/%,$(DOCCRATES))
 
 docs: mkdocs subst
 
-$(CRATES): VERSION
+# https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html
+$(VERSIONS): Cargo.toml
+	mkdir -p $(@D)
+	cargo pkgid $(@F) | sed -e "s/.*#\(\|.*:\)//" > "$@"
+
+$(DOCCRATES): %: target/VERS/%
 	# Put in the crate version into the docs
-	find ./doc/$@ -name "*.html" -exec sed -i -e "s/<title>\(.*\) - Rust/<title>$@ $(shell cat VERSION) - \1 - Rust/g" {} \;
+	find ./doc/$@ -name "*.html" -exec sed -i -e "s/<title>\(.*\) - Rust/<title>$@ $(shell cat $<) - \1 - Rust/g" {} \;
 
-subst: $(CRATES)
+subst: $(DOCCRATES)
 
-mkdocs:
+mkdocs: Cargo.toml
 	cargo doc
 	rm -rf ./doc
 	cp -r ./target/doc ./doc
 	-cat ./custom.css >> doc/main.css
 
-VERSION: Cargo.toml
-	cargo pkgid | sed -e "s/.*#//" > VERSION
-
-.PHONY: docs mkdocs subst $(CRATES)
+.PHONY: docs mkdocs subst $(DOCCRATES)
