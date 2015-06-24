@@ -9,7 +9,6 @@ use std::mem;
 use std::ptr::null_mut;
 use std::default::Default;
 use std::borrow::Borrow;
-use std::fmt::Debug;
 use std::slice;
 use odds;
 
@@ -34,6 +33,7 @@ use odds::debug_assert_unreachable;
 
 const MAX_ORDER: usize = 12;
 
+#[allow(raw_pointer_derive)]
 #[derive(Debug)]
 struct Entry<K, V> {
     keys: ArrayVec<[K; MAX_ORDER - 1]>,
