@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(test, collections)]
+#![feature(test, collections_bound, btree_range)]
 extern crate bmap;
 extern crate rand;
 extern crate test;
