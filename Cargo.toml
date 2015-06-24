@@ -3,6 +3,8 @@ name = "bmap"
 version = "0.1.0"
 authors = ["bluss"]
 
+license = "GPL-3.0"
+
 description = "A high performance version of a B-Tree map. API is still changing, depend on explicit 0.x versions to avoid breakage."
 documentation = "http://bluss.github.io/bmap"
 repository = "https://github.com/bluss/bmap"
