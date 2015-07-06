@@ -24,7 +24,6 @@ use std::mem;
 use std::ptr::null_mut;
 use std::default::Default;
 use std::borrow::Borrow;
-use std::slice;
 use odds;
 
 #[cfg(test)]
@@ -42,8 +41,6 @@ use std::ops::{
     Index,
     IndexMut,
 };
-
-use odds::debug_assert_unreachable;
 
 // B=6, and MAX_ORDER = 2 * B in Btreemap
 
@@ -743,8 +740,8 @@ impl<K, V> Bmap<K, V>
                 if has_end {
                     return Range {
                         entry: entry,
-                        keyiter: entry.keys[i..j + 1].iter(),
-                        valiter: entry.values[i..j + 1].iter(),
+                        keyiter: ZipSlices::new(&entry.keys[i..j + 1],
+                                                &entry.values[i..j + 1]),
                         last: true,
                         end: l,
                     }
@@ -752,8 +749,8 @@ impl<K, V> Bmap<K, V>
                     // `j` may be == keys.len() here or shorter.
                     return Range {
                         entry: entry,
-                        keyiter: entry.keys[i..j].iter(),
-                        valiter: entry.values[i..j].iter(),
+                        keyiter: ZipSlices::new(&entry.keys[i..j],
+                                                &entry.values[i..j]),
                         last: false,
                         end: l,
                     }
@@ -768,8 +765,7 @@ impl<K, V> Bmap<K, V>
                 }
                 return Range {
                     entry: entry,
-                    keyiter: [].iter(),
-                    valiter: [].iter(),
+                    keyiter: ZipSlices::new(&[], &[]),
                     last: false,
                     end: l,
                 }
@@ -901,8 +897,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
 /// Key range iterator.
 pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
-    keyiter: slice::Iter<'a, K>,
-    valiter: slice::Iter<'a, V>,
+    keyiter: ZipSlices<&'a [K], &'a [V]>,
     last: bool,
     end: &'a Q,
 }
@@ -912,7 +907,6 @@ impl<'a, K, V, Q> Clone for Range<'a, K, V, Q> {
         Range {
             entry: self.entry,
             keyiter: self.keyiter.clone(),
-            valiter: self.valiter.clone(),
             last: self.last,
             end: self.end,
         }
@@ -966,13 +960,15 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                 if has_end {
                     // setup termination
                     self.last = true;
-                    self.keyiter = odds::slice_unchecked(&entry.keys, 0, j + 1).iter();
-                    self.valiter = odds::slice_unchecked(&entry.values, 0, j + 1).iter();
+                    self.keyiter = ZipSlices::new(
+                        odds::slice_unchecked(&entry.keys, 0, j + 1),
+                        odds::slice_unchecked(&entry.values, 0, j + 1))
                 } else {
                     // `j` may be == keys.len() or shorter. If shorter, we are done.
                     self.last = j != entry.keys.len();
-                    self.keyiter = odds::slice_unchecked(&entry.keys, 0, j).iter();
-                    self.valiter = odds::slice_unchecked(&entry.values, 0, j).iter();
+                    self.keyiter = ZipSlices::new(
+                        odds::slice_unchecked(&entry.keys, 0, j),
+                        odds::slice_unchecked(&entry.values, 0, j));
                 }
             }
             self.entry = entry;
@@ -991,13 +987,8 @@ impl<'a, K, V, Q> Iterator for Range<'a, K, V, Q>
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         debug_assert!(self.entry.is_leaf());
-        if let Some(key) = self.keyiter.next() {
-            unsafe {
-                match self.valiter.next() {
-                    Some(value) => Some((key, value)),
-                    None => debug_assert_unreachable(), // key, value pairs
-                }
-            }
+        if let elt @ Some(..) = self.keyiter.next() {
+            elt
         } else {
             self.next_switch_node()
         }
