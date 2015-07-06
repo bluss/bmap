@@ -31,8 +31,9 @@ use odds;
 extern crate rand;
 #[cfg(test)]
 use rand::{Rng, ChaChaRng, SeedableRng};
-#[cfg(test)]
+
 extern crate itertools as it;
+use self::it::ZipSlices;
 
 #[cfg(test)]
 use odds::Fix;
@@ -688,8 +689,7 @@ impl<K, V> Bmap<K, V>
         }
         Iter {
             entry: entry,
-            keyiter: entry.keys.iter(),
-            valiter: entry.values.iter(),
+            keyiter: ZipSlices::new(&entry.keys, &entry.values),
         }
     }
 
@@ -707,8 +707,7 @@ impl<K, V> Bmap<K, V>
             if entry.is_leaf() {
                 return Iter {
                     entry: entry,
-                    keyiter: entry.keys[i..].iter(),
-                    valiter: entry.values[i..].iter(),
+                    keyiter: ZipSlices::new(&entry.keys[i..], &entry.values[i..]),
                 }
             } else if has {
                 entry = &entry.children[i];
@@ -720,8 +719,7 @@ impl<K, V> Bmap<K, V>
                 }
                 return Iter {
                     entry: entry,
-                    keyiter: [].iter(),
-                    valiter: [].iter(),
+                    keyiter: ZipSlices::new(&[], &[]),
                 }
             } else {
                 entry = &entry.children[i];
@@ -834,8 +832,7 @@ impl<'a, K, V> Extend<(&'a K, &'a V)> for Bmap<K, V>
 /// Default iterator for **Bmap**.
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
-    keyiter: slice::Iter<'a, K>,
-    valiter: slice::Iter<'a, V>,
+    keyiter: ZipSlices<&'a [K], &'a [V]>,
 }
 
 impl<'a, K, V> Clone for Iter<'a, K, V> {
@@ -843,7 +840,6 @@ impl<'a, K, V> Clone for Iter<'a, K, V> {
         Iter {
             entry: self.entry,
             keyiter: self.keyiter.clone(),
-            valiter: self.valiter.clone(),
         }
     }
 }
@@ -880,8 +876,7 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
                     entry = entry_;
                 }
             }
-            self.keyiter = entry.keys.iter();
-            self.valiter = entry.values.iter();
+            self.keyiter = ZipSlices::new(&entry.keys, &entry.values);
             self.entry = entry;
             return Some((next_key, next_value));
         }
@@ -895,13 +890,8 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         debug_assert!(self.entry.is_leaf());
-        if let Some(key) = self.keyiter.next() {
-            unsafe {
-                match self.valiter.next() {
-                    Some(value) => Some((key, value)),
-                    None => debug_assert_unreachable(), // key, value pairs
-                }
-            }
+        if let elt @ Some(..) = self.keyiter.next() {
+            elt
         } else {
             self.next_switch_node()
         }

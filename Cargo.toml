@@ -10,17 +10,19 @@ documentation = "http://bluss.github.io/bmap"
 repository = "https://github.com/bluss/bmap"
 keywords = ["data-structure", "btreemap", "b-tree", "range"]
 
+[dependencies.itertools]
+version = "0.3.22"
+
 [dependencies.arrayvec]
 #path = "../arrayvec"
 version = "0.3.4"
 
 [dev-dependencies]
 rand = "*"
-itertools = "0.3.11"
 
 [dependencies.odds]
 version = "0.2.2"
 
 [profile.bench]
 #lto = false
-#debug = true
+debug = true
