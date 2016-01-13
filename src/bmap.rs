@@ -48,7 +48,6 @@ use std::ops::{
 
 const MAX_ORDER: usize = 12;
 
-#[allow(raw_pointer_derive)]
 #[derive(Debug)]
 struct Entry<K, V> {
     keys: ArrayVec<[K; MAX_ORDER - 1]>,
