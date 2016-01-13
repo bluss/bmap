@@ -37,6 +37,8 @@ use self::it::ZipSlices;
 #[cfg(test)]
 use odds::Fix;
 
+use odds::ptr_eq;
+
 use std::ops::{
     Index,
     IndexMut,
@@ -855,7 +857,7 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
                 Some(parent) => parent,
             };
             debug_assert!(i <= entry.keys.len());
-            debug_assert!(child as *const _ == &*entry.children[i] as *const _);
+            debug_assert!(ptr_eq(child, &*entry.children[i]));
             if i == entry.keys.len() {
                 continue;
             }
@@ -931,7 +933,7 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                 Some(parent) => parent,
             };
             debug_assert!(i <= entry.keys.len());
-            debug_assert!(child as *const _ == &*entry.children[i] as *const _);
+            debug_assert!(ptr_eq(child, &*entry.children[i]));
             if i == entry.keys.len() {
                 continue;
             }
@@ -1011,7 +1013,7 @@ fn test_new() {
     println!("{:?}", bp);
 
     let mut bp = Bmap::new();
-    for x in (0..20) {
+    for x in 0..20 {
         bp.insert(x, x);
     }
 }
@@ -1134,8 +1136,7 @@ fn test_fuzz_remove() {
         let check_parents = |f: Fix<_, _>, entry| {
             let entry: &Entry<_, _> = entry;
             entry.children.iter().all(|c|
-                odds::ptr_eq(c.parent, entry)
-                && f.call(&**c)
+                ptr_eq(c.parent, entry) && f.call(&**c)
             )
         };
         assert!(Fix(&check_parents).call(&*m.root));
