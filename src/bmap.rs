@@ -618,7 +618,7 @@ impl<K, V> Bmap<K, V>
                 } else {
                     // Strategy: Swap with predecessor, always in a leaf
                     //
-                    let (mut pred_key, mut pred_value);
+                    let (pred_key, pred_value);
                     {
                         // FIXME: Need real delete traversal to keep invariants
                         let mut iter = &mut entry.children[pos];
