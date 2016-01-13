@@ -5,7 +5,7 @@ authors = ["bluss"]
 
 license = "GPL-3.0"
 
-description = "A high performance version of a B-Tree map. API is still changing, depend on explicit 0.x versions to avoid breakage."
+description = "A high performance version of a B-Tree map. API is still changing."
 documentation = "http://bluss.github.io/bmap"
 repository = "https://github.com/bluss/bmap"
 keywords = ["data-structure", "btreemap", "b-tree", "range"]
@@ -14,7 +14,6 @@ keywords = ["data-structure", "btreemap", "b-tree", "range"]
 version = "0.3.22"
 
 [dependencies.arrayvec]
-#path = "../arrayvec"
 version = "0.3.4"
 
 [dev-dependencies]
