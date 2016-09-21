@@ -35,7 +35,7 @@ extern crate itertools as it;
 use self::it::ZipSlices;
 
 #[cfg(test)]
-use odds::Fix;
+use odds::fix;
 
 use odds::ptr_eq;
 
@@ -1130,15 +1130,10 @@ fn test_fuzz_remove() {
             assert_eq!(removed.is_some(), is_present);
         }
 
-
         // check all parent links
-        let check_parents = |f: Fix<_, _>, entry| {
-            let entry: &Entry<_, _> = entry;
-            entry.children.iter().all(|c|
-                ptr_eq(c.parent, entry) && f.call(&**c)
-            )
-        };
-        assert!(Fix(&check_parents).call(&*m.root));
+        assert!(fix(&*m.root, |f, entry| {
+            entry.children.iter().all(|c| ptr_eq(c.parent, entry) && f.call(&**c))
+        }));
 
         //println!("After remove: {:#?}", m);
         assert_eq!(m.iter().count(), m.len());
