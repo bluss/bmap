@@ -1,0 +1,8 @@
+language: rust
+sudo: false
+matrix:
+  include:
+    - rust: nightly
+branches:
+  only:
+    - master
