@@ -2,11 +2,12 @@
 bmap
 ====
 
-A high performance version of a B-Tree map.
+A version of a B-Tree map based on ArrayVec
 
 Highlights:
 
-- Fast iteration, especially for small maps (2-10x improvement over libstd's BTreeMap)
+- Fast iteration, especially for small maps (up to 50% shorter runtime compared
+  with libstd's BTreeMap in iteration microbenchmarks)
 
 Future plans:
 
@@ -20,16 +21,7 @@ Documentation
 
 API is still changing, depend on explicit 0.x versions to avoid breakage.
 
-**Note: docs & crate are not available yet**
-
-How to use with cargo::
-
-    [dependencies]
-    bmap = "0.1"
-
-Please read the `API documentation here`__
-
-__ http://bluss.github.io/bmap
+**Note: docs & crate are not published yet, sorry!**
 
 |build_status|_ |crates|_
 
