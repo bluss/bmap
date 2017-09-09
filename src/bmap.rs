@@ -78,8 +78,9 @@ impl<K, V> Clone for Box<Entry<K, V>>
     }
 }
 
-impl<K, V> Entry<K, V> {
-    fn new() -> Self {
+impl<K, V> Default for Entry<K, V> {
+    #[inline]
+    fn default() -> Self {
         Entry {
             keys: ArrayVec::new(),
             values: ArrayVec::new(),
@@ -87,6 +88,12 @@ impl<K, V> Entry<K, V> {
             parent: null_mut(),
             position: 0,
         }
+    }
+}
+
+impl<K, V> Entry<K, V> {
+    fn new() -> Self {
+        Self::default()
     }
 
     fn max_order() -> usize { MAX_ORDER }
@@ -464,7 +471,7 @@ impl<K, V> Bmap<K, V>
     pub fn new() -> Self {
         Bmap {
             length: 0,
-            root: Box::new(Entry::new()),
+            root: Box::default(),
         }
     }
 

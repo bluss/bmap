@@ -279,6 +279,13 @@ fn bench_iter_range_bmap(b: &mut Bencher, size: i32) {
 }
 
 #[bench]
+pub fn bmap_new(b: &mut Bencher) {
+    b.iter(|| {
+        Bmap::<i32, i32>::new()
+    })
+}
+
+#[bench]
 pub fn iter_20_btree(b: &mut Bencher) {
     bench_iter(b, 20);
 }
