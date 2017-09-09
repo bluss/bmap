@@ -92,10 +92,6 @@ impl<K, V> Default for Entry<K, V> {
 }
 
 impl<K, V> Entry<K, V> {
-    fn new() -> Self {
-        Self::default()
-    }
-
     fn max_order() -> usize { MAX_ORDER }
     fn min_order() -> usize { Self::max_order() / 2 }
     fn median_key_index() -> usize { (Self::max_order() - 1) / 2 }
@@ -113,7 +109,7 @@ impl<K, V> Entry<K, V> {
         debug_assert!(self.full());
 
         // new right side tree
-        let mut right = Box::new(Entry::new());
+        let mut right = <Box<Entry<_, _>>>::default();
 
         /* Split keys and children between `left` and `right` */
         // keys:      [ b d f ]    ->  [ b ] d [ f ]
@@ -563,7 +559,7 @@ impl<K, V> Bmap<K, V>
                     // Root was split, replace it with a new empty node,
                     // left side: old root
                     // right side: right_child
-                    let left_child = mem::replace(root, Box::new(Entry::new()));
+                    let left_child = mem::replace(root, Box::default());
                     root.insert_in_root(median_k, median_v,
                                         left_child, right_child);
                     kv = kv_;
