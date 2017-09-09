@@ -14,7 +14,7 @@ keywords = ["data-structure", "btreemap", "b-tree", "range"]
 version = "0.4"
 
 [dependencies.arrayvec]
-version = "0.3.4"
+version = "0.4"
 features = ["use_union"]
 
 [dev-dependencies]

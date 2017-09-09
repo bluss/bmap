@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![feature(test, collections_bound, btree_range)]
+#![feature(test)]
 extern crate bmap;
 extern crate rand;
 extern crate test;
@@ -242,7 +242,7 @@ fn bench_iter_range_btree(b: &mut Bencher, size: i32) {
     }
 
     b.iter(|| {
-        for entry in map.range(Bound::Included(&i32::min_value()), Bound::Included(&i32::max_value())) {
+        for entry in map.range((Bound::Included(&i32::min_value()), Bound::Included(&i32::max_value()))) {
             black_box(entry);
         }
     });

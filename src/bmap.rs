@@ -267,12 +267,12 @@ impl<K, V> Entry<K, V> {
         where K: Ord
     {
         debug_assert!(!self.full());
-        self.keys.insert(pos, key);
-        self.values.insert(pos, value);
+        let _ = self.keys.try_insert(pos, key);
+        let _ = self.values.try_insert(pos, value);
         if let Some(mut child_) = child {
             child_.parent = self;
             child_.position = pos + 1;
-            self.children.insert(pos + 1, child_);
+            let _ = self.children.try_insert(pos + 1, child_);
             for child in &mut self.children[pos + 2..] {
                 child.position += 1;
             }
@@ -286,14 +286,14 @@ impl<K, V> Entry<K, V> {
         debug_assert!(self.keys.len() == 0);
         debug_assert!(self.values.len() == 0);
         debug_assert!(self.children.len() == 0);
-        self.keys.push(key);
-        self.values.push(value);
+        let _ = self.keys.try_push(key);
+        let _ = self.values.try_push(value);
         left.position = 0;
         left.parent = self;
-        self.children.push(left);
+        let _ = self.children.try_push(left);
         right.position = 1;
         right.parent = self;
-        self.children.push(right);
+        let _ = self.children.try_push(right);
     }
 
     fn update(&mut self, key: &K, value: V) -> V
@@ -309,7 +309,7 @@ impl<K, V> Entry<K, V> {
         debug_assert!(self.is_leaf());
         let key = self.keys.remove(pos);
         let value = self.values.remove(pos);
-        (key.unwrap(), value.unwrap())
+        (key, value)
     }
 
     #[inline]
@@ -327,9 +327,9 @@ impl<K, V> Entry<K, V> {
 
     fn remove_first(&mut self) -> (K, V, Option<Box<Entry<K, V>>>) {
         debug_assert!(self.order() > Self::min_order());
-        let rkey = self.keys.remove(0).unwrap();
-        let rval = self.values.remove(0).unwrap();
-        let child = self.children.remove(0);
+        let rkey = self.keys.remove(0);
+        let rval = self.values.remove(0);
+        let child = self.children.pop_at(0);
         for other in &mut self.children {
             other.position -= 1;
         }
@@ -346,15 +346,15 @@ impl<K, V> Entry<K, V> {
 
     fn insert_first(&mut self, key: K, value: V, child: Option<Box<Entry<K, V>>>) {
         debug_assert!(!self.full());
-        self.keys.insert(0, key);
-        self.values.insert(0, value);
+        let _ = self.keys.try_insert(0, key);
+        let _ = self.values.try_insert(0, value);
         if let Some(mut child) = child {
             for other in &mut self.children {
                 other.position += 1;
             }
             child.parent = self;
             child.position = 0;
-            self.children.insert(0, child);
+            let _ = self.children.try_insert(0, child);
         }
     }
 
@@ -403,9 +403,9 @@ impl<K, V> Entry<K, V> {
     /// Return **true** if **self** was emptied
     fn merge_siblings(self: &mut Entry<K, V>, pos: usize) -> bool {
         // FIXME: We might kill the parent
-        let pkey = self.keys.remove(pos).unwrap();
-        let pval = self.values.remove(pos).unwrap();
-        let right_child = *self.children.remove(pos + 1).unwrap();
+        let pkey = self.keys.remove(pos);
+        let pval = self.values.remove(pos);
+        let right_child = *self.children.remove(pos + 1);
         //assert!(self.keys.len() > 0);
         let removed_root = self.keys.len() == 0;
         for child in &mut self.children[pos + 1..] {
