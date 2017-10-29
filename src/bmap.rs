@@ -37,7 +37,7 @@ use self::it::ZipSlices;
 #[cfg(test)]
 use odds::fix;
 
-use odds::ptr_eq;
+use std::ptr::eq as ptr_eq;
 
 use std::ops::{
     Index,
