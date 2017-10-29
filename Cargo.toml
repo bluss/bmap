@@ -10,6 +10,8 @@ documentation = "http://bluss.github.io/bmap"
 repository = "https://github.com/bluss/bmap"
 keywords = ["data-structure", "btreemap", "b-tree", "range"]
 
+[dependencies]
+unchecked-index = { version = "*", path = "../unchecked-index/" }
 [dependencies.itertools]
 version = "0.4"
 

@@ -11,7 +11,10 @@ extern crate arrayvec;
 #[cfg(test)]
 extern crate rand;
 
+#[cfg(test)]
 extern crate odds;
+
+extern crate unchecked_index;
 
 #[macro_use]
 mod macros;

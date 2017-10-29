@@ -24,7 +24,6 @@ use std::mem;
 use std::ptr::null_mut;
 use std::default::Default;
 use std::borrow::Borrow;
-use odds;
 
 #[cfg(test)]
 extern crate rand;
@@ -43,6 +42,12 @@ use std::ops::{
     Index,
     IndexMut,
 };
+
+macro_rules! unchecked {
+    ($slice:expr, $index:expr) => {
+        ::unchecked_index::get_unchecked(&$slice[..], $index)
+    }
+}
 
 // B=6, and MAX_ORDER = 2 * B in Btreemap
 
@@ -867,11 +872,11 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
             let next_value;
             // Unchecked indexing improves iteration runtime by minuscle 2%.
             unsafe {
-                next_key = odds::get_unchecked(&*entry.keys, i);
-                next_value = odds::get_unchecked(&*entry.values, i);
+                next_key = unchecked!(entry.keys, i);
+                next_value = unchecked!(entry.values, i);
 
                 // dig down to successor
-                entry = &odds::get_unchecked(&*entry.children, i + 1);
+                entry = &unchecked!(entry.children, i + 1);
                 while let Some(entry_) = entry.children.get(0) {
                     entry = entry_;
                 }
@@ -943,11 +948,11 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
             let next_value;
             // Unchecked indexing improves iteration runtime by minuscle 2%.
             unsafe {
-                next_key = odds::get_unchecked(&*entry.keys, i);
-                next_value = odds::get_unchecked(&*entry.values, i);
+                next_key = unchecked!(entry.keys, i);
+                next_value = unchecked!(entry.values, i);
 
                 // dig down to successor
-                entry = &odds::get_unchecked(&*entry.children, i + 1);
+                entry = &unchecked!(&*entry.children, i + 1);
                 while let Some(entry_) = entry.children.get(0) {
                     entry = entry_;
                 }
@@ -965,14 +970,14 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                     // setup termination
                     self.last = true;
                     self.keyiter = ZipSlices::new(
-                        odds::slice_unchecked(&entry.keys, 0, j + 1),
-                        odds::slice_unchecked(&entry.values, 0, j + 1))
+                        unchecked!(entry.keys, ..j + 1),
+                        unchecked!(entry.values, ..j + 1))
                 } else {
                     // `j` may be == keys.len() or shorter. If shorter, we are done.
                     self.last = j != entry.keys.len();
                     self.keyiter = ZipSlices::new(
-                        odds::slice_unchecked(&entry.keys, 0, j),
-                        odds::slice_unchecked(&entry.values, 0, j));
+                        unchecked!(entry.keys, ..j),
+                        unchecked!(entry.values, ..j));
                 }
             }
             self.entry = entry;
