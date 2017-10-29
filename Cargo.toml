@@ -12,8 +12,7 @@ keywords = ["data-structure", "btreemap", "b-tree", "range"]
 
 [dependencies]
 unchecked-index = { version = "*", path = "../unchecked-index/" }
-[dependencies.itertools]
-version = "0.4"
+itertools = "0.7"
 
 [dependencies.arrayvec]
 version = "0.4"

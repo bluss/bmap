@@ -30,8 +30,9 @@ extern crate rand;
 #[cfg(test)]
 use rand::{Rng, ChaChaRng, SeedableRng};
 
-extern crate itertools as it;
-use self::it::ZipSlices;
+use itertools::zip as zip;
+use std::slice::Iter as SliceIter;
+type ZipSlices<'a, K, V> = ::std::iter::Zip<SliceIter<'a, K>, SliceIter<'a, V>>;
 
 #[cfg(test)]
 use odds::fix;
@@ -695,7 +696,7 @@ impl<K, V> Bmap<K, V>
         }
         Iter {
             entry: entry,
-            keyiter: ZipSlices::new(&entry.keys, &entry.values),
+            keyiter: zip(&entry.keys, &entry.values),
         }
     }
 
@@ -713,7 +714,7 @@ impl<K, V> Bmap<K, V>
             if entry.is_leaf() {
                 return Iter {
                     entry: entry,
-                    keyiter: ZipSlices::new(&entry.keys[i..], &entry.values[i..]),
+                    keyiter: zip(&entry.keys[i..], &entry.values[i..]),
                 }
             } else if has {
                 entry = &entry.children[i];
@@ -725,7 +726,7 @@ impl<K, V> Bmap<K, V>
                 }
                 return Iter {
                     entry: entry,
-                    keyiter: ZipSlices::new(&[], &[]),
+                    keyiter: zip(&[], &[]),
                 }
             } else {
                 entry = &entry.children[i];
@@ -749,8 +750,8 @@ impl<K, V> Bmap<K, V>
                 if has_end {
                     return Range {
                         entry: entry,
-                        keyiter: ZipSlices::new(&entry.keys[i..j + 1],
-                                                &entry.values[i..j + 1]),
+                        keyiter: zip(&entry.keys[i..j + 1],
+                                       &entry.values[i..j + 1]),
                         last: true,
                         end: l,
                     }
@@ -758,8 +759,8 @@ impl<K, V> Bmap<K, V>
                     // `j` may be == keys.len() here or shorter.
                     return Range {
                         entry: entry,
-                        keyiter: ZipSlices::new(&entry.keys[i..j],
-                                                &entry.values[i..j]),
+                        keyiter: zip(&entry.keys[i..j],
+                                       &entry.values[i..j]),
                         last: false,
                         end: l,
                     }
@@ -774,7 +775,7 @@ impl<K, V> Bmap<K, V>
                 }
                 return Range {
                     entry: entry,
-                    keyiter: ZipSlices::new(&[], &[]),
+                    keyiter: zip(&[], &[]),
                     last: false,
                     end: l,
                 }
@@ -837,7 +838,7 @@ impl<'a, K, V> Extend<(&'a K, &'a V)> for Bmap<K, V>
 /// Default iterator for **Bmap**.
 pub struct Iter<'a, K: 'a, V: 'a> {
     entry: &'a Entry<K, V>,
-    keyiter: ZipSlices<&'a [K], &'a [V]>,
+    keyiter: ZipSlices<'a, K, V>,
 }
 
 impl<'a, K, V> Clone for Iter<'a, K, V> {
@@ -881,7 +882,7 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
                     entry = entry_;
                 }
             }
-            self.keyiter = ZipSlices::new(&entry.keys, &entry.values);
+            self.keyiter = zip(&entry.keys, &entry.values);
             self.entry = entry;
             return Some((next_key, next_value));
         }
@@ -906,7 +907,7 @@ impl<'a, K: Ord, V> Iterator for Iter<'a, K, V> {
 /// Key range iterator.
 pub struct Range<'a, K: 'a, V: 'a, Q: 'a> {
     entry: &'a Entry<K, V>,
-    keyiter: ZipSlices<&'a [K], &'a [V]>,
+    keyiter: ZipSlices<'a, K, V>,
     last: bool,
     end: &'a Q,
 }
@@ -969,13 +970,13 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                 if has_end {
                     // setup termination
                     self.last = true;
-                    self.keyiter = ZipSlices::new(
+                    self.keyiter = zip(
                         unchecked!(entry.keys, ..j + 1),
                         unchecked!(entry.values, ..j + 1))
                 } else {
                     // `j` may be == keys.len() or shorter. If shorter, we are done.
                     self.last = j != entry.keys.len();
-                    self.keyiter = ZipSlices::new(
+                    self.keyiter = zip(
                         unchecked!(entry.keys, ..j),
                         unchecked!(entry.values, ..j));
                 }
@@ -1005,6 +1006,8 @@ impl<'a, K, V, Q> Iterator for Range<'a, K, V, Q>
 }
 
 
+#[cfg(test)]
+use itertools::{assert_equal, equal};
 
 #[test]
 fn test_new() {
@@ -1278,7 +1281,7 @@ fn test_clone() {
     let t1 = create_random_tree::<i32, i32>(512);
     let t2 = t1.clone();
 
-    it::assert_equal(t1.iter(), t2.iter());
+    assert_equal(t1.iter(), t2.iter());
 }
 
 #[test]
@@ -1289,7 +1292,7 @@ fn test_iter_from() {
         let t1 = create_random_tree::<u8, ()>(sz);
         for key in 0..256 {
             let key8 = key as u8;
-            it::assert_equal(t1.iter_from(&key8), t1.iter().filter(|&(&k, _)| k >= key8));
+            assert_equal(t1.iter_from(&key8), t1.iter().filter(|&(&k, _)| k >= key8));
         }
     }
 }
@@ -1306,7 +1309,7 @@ fn test_iter_range() {
             for key2 in key1..256 {
                 let key1_8 = key1 as u8;
                 let key2_8 = key2 as u8;
-                assert!(it::equal(t1.range(&key1_8, &key2_8),
+                assert!(equal(t1.range(&key1_8, &key2_8),
                           t1.iter().filter(|&(&k, _)| k >= key1_8 && k <= key2_8)),
                         "failed: equal for Range from={}, to={}, \niter1={:?}\ntree={:?}",
                         key1, key2, t1.range(&key1_8, &key2_8).map(tup_get_0).collect::<Vec<_>>(),

@@ -10,6 +10,7 @@
 extern crate arrayvec;
 #[cfg(test)]
 extern crate rand;
+extern crate itertools;
 
 #[cfg(test)]
 extern crate odds;
