@@ -877,7 +877,7 @@ impl<'a, K: Ord, V> Iter<'a, K, V> {
                 next_value = unchecked!(entry.values, i);
 
                 // dig down to successor
-                entry = &unchecked!(entry.children, i + 1);
+                entry = unchecked!(entry.children, i + 1);
                 while let Some(entry_) = entry.children.get(0) {
                     entry = entry_;
                 }
@@ -953,7 +953,7 @@ impl<'a, K, V, Q> Range<'a, K, V, Q>
                 next_value = unchecked!(entry.values, i);
 
                 // dig down to successor
-                entry = &unchecked!(&*entry.children, i + 1);
+                entry = unchecked!(entry.children, i + 1);
                 while let Some(entry_) = entry.children.get(0) {
                     entry = entry_;
                 }
