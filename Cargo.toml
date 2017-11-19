@@ -20,10 +20,7 @@ features = ["use_union"]
 
 [dev-dependencies]
 rand = "0.3"
-
-[dev-dependencies.odds]
-version = "0.2.16"
+odds = { version = "0.3.0" }
 
 [profile.bench]
-#lto = false
 debug = true
